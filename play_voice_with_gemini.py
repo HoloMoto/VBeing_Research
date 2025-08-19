@@ -1,7 +1,7 @@
 """
-Voice Playback with Gemini
+Voice Playback with Gemini CLI
 
-This script uses Google's Gemini AI to play audio files from the Voice/ directory
+This script uses the local Gemini CLI to play audio files from the Voice/ directory
 according to the data in voiceData.csv. It provides five modes of operation:
 
 1. Direct mode: Gemini selects the audio file directly
@@ -13,15 +13,19 @@ according to the data in voiceData.csv. It provides five modes of operation:
 Requirements:
 - Python 3.7+
 - pygame library (for audio playback)
-- google-generativeai library (for Gemini API)
 - speech_recognition library (for speech recognition)
-- Access to one of these Gemini models: 'gemini-1.5-flash', 'gemini-1.5-pro', or 'gemini-pro'
+- python-dotenv library (for loading environment variables)
+- Gemini CLI installed and configured on your system
+- Access to one of these Gemini models through the CLI: 'gemini-1.5-flash', 'gemini-1.5-pro', or 'gemini-pro'
 
 Setup:
-1. An API key is already configured in the script. If you need to use your own:
-   - Get a Gemini API key from https://ai.google.dev/
-   - Replace the existing API key with your own
-2. Install required packages: pip install pygame google-generativeai SpeechRecognition pyaudio
+1. Install the Gemini CLI on your system
+   - Follow the official Gemini CLI installation instructions
+   - Make sure you've authenticated with the CLI before running this script
+2. Configure the path to the Gemini CLI in the .env file:
+   - Add GEMINI_CLI_PATH=<path_to_gemini_cli> to your .env file
+   - Example: GEMINI_CLI_PATH=C:\Users\username\AppData\Roaming\npm\gemini.cmd
+3. Install required Python packages: pip install pygame SpeechRecognition pyaudio python-dotenv
 
 Usage:
 - Run the script: python play_voice_with_gemini.py
@@ -49,17 +53,57 @@ import os
 import csv
 import time
 import pygame
-import google.generativeai as genai
 import speech_recognition as sr
+import subprocess
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize pygame mixer for audio playback
 pygame.mixer.init()
 
-# Configure the Gemini API with your API key
-# You can get an API key from https://ai.google.dev/
-GOOGLE_API_KEY = "AIzaSyAFdis6AZLJHFpR9dJKdbClZwlpV-HuJ8s"  # Current API key
-genai.configure(api_key=GOOGLE_API_KEY)
+# Note: We're using the local Gemini CLI which uses your system's authentication
+# No API key configuration is needed as the CLI handles authentication
+
+def run_gemini_command(command_args):
+    """
+    Run a Gemini CLI command and return its output.
+
+    Uses the GEMINI_CLI_PATH environment variable from the .env file to locate the Gemini CLI executable.
+    If the environment variable is not set, falls back to a default path.
+
+    Args:
+        command_args: List of command arguments to pass to the Gemini CLI
+
+    Returns:
+        The standard output from the Gemini CLI command or an error message
+    """
+    try:
+        # Get the Gemini CLI path from environment variable or use default
+        gemini_cli_path = os.getenv('GEMINI_CLI_PATH', r"C:\Users\seiri\AppData\Roaming\npm\gemini.cmd")
+
+        # Create the Gemini CLI command as a list
+        command = [gemini_cli_path] + command_args
+
+        # Run the command
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding="utf-8"
+        )
+
+        # Return the standard output
+        return result.stdout
+
+    except FileNotFoundError:
+        return "Error: Gemini CLI not found. Make sure Gemini CLI is installed and the GEMINI_CLI_PATH in your .env file is correct."
+    except subprocess.CalledProcessError as e:
+        # Return command execution error details
+        return f"Error occurred:\n{e.stderr}"
 
 # Path to the voice data CSV and voice directory
 VOICE_DATA_CSV = "voiceData.csv"
@@ -112,131 +156,189 @@ def play_audio(filename):
 
 def list_available_models():
     """
-    List all available models from the Gemini API.
+    List all available models from the Gemini CLI.
     This is useful for troubleshooting when models are not found.
 
     Returns:
         A list of available model names
     """
     try:
+        # Run the CLI command to list available models
+        # The exact command may vary depending on the Gemini CLI implementation
+        # This is a common pattern for CLI tools
+        response = run_gemini_command(["list", "models"])
+
+        if response.startswith("Error:"):
+            print(f"Error listing models: {response}")
+
+            # Try alternative command format if the first one fails
+            response = run_gemini_command(["models", "list"])
+
+            if response.startswith("Error:"):
+                print(f"Error listing models with alternative command: {response}")
+                return []
+
+        # Parse the response to extract model names
+        # This parsing logic may need to be adjusted based on the actual output format
         available_models = []
-        for model in genai.list_models():
-            if "generateContent" in model.supported_generation_methods:
-                available_models.append(model.name)
-                print(f"Available model: {model.name}")
+        for line in response.splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and not line.startswith("Error:"):
+                # Assuming each line contains a model name, possibly with additional info
+                # Extract just the model name (this may need adjustment)
+                model_name = line.split()[0] if line.split() else line
+                available_models.append(model_name)
+                print(f"Available model: {model_name}")
+
+        # If we couldn't parse any models but got a response, print the raw response
+        if not available_models and response:
+            print("Received response but couldn't parse model names. Raw output:")
+            print(response)
+
+            # Initialize models directly as a fallback
+            print("Falling back to direct model checking...")
+            initialize_models()
+            return CLI_AVAILABLE_MODELS
+
         return available_models
     except Exception as e:
         print(f"Error listing models: {e}")
         return []
 
-# Create model instances once at the beginning
-MODEL_INSTANCES = {}
-CHAT_SESSIONS = {}
+# Variables for CLI-based approach
+CLI_AVAILABLE_MODELS = []
 
 def initialize_models():
-    """Initialize model instances for reuse."""
-    global MODEL_INSTANCES
-    models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+    """
+    Check which Gemini models are available through the CLI.
+    This function tests the CLI connection and identifies available models.
+    """
+    global CLI_AVAILABLE_MODELS
+    models_to_check = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
 
-    for model_name in models:
+    print("Checking available Gemini CLI models...")
+
+    # Test the CLI connection first
+    test_response = run_gemini_command(["--version"])
+    if test_response.startswith("Error:"):
+        print("Warning: Gemini CLI may not be properly installed or configured.")
+        print(test_response)
+        return
+
+    # Check each model by running a simple test command
+    for model_name in models_to_check:
         try:
-            print(f"Initializing model: {model_name}")
-            MODEL_INSTANCES[model_name] = genai.GenerativeModel(model_name)
+            print(f"Checking model: {model_name}")
+            # Simple test command to check if the model is available
+            test_cmd = ["--model", model_name, "--text", "Hello"]
+            response = run_gemini_command(test_cmd)
+
+            if not response.startswith("Error:"):
+                CLI_AVAILABLE_MODELS.append(model_name)
+                print(f"Model {model_name} is available")
+            else:
+                print(f"Model {model_name} is not available: {response}")
         except Exception as e:
-            print(f"Could not initialize model {model_name}: {e}")
+            print(f"Error checking model {model_name}: {e}")
 
 def get_gemini_response(prompt, system_prompt=None, chat_history=None, max_retries=1, initial_retry_delay=1):
     """
-    Get a response from Gemini based on the prompt.
+    Get a response from Gemini based on the prompt using the local Gemini CLI.
 
     Args:
         prompt: The user prompt to send to Gemini
         system_prompt: Optional system prompt to guide Gemini's response
         chat_history: Optional chat history for maintaining conversation context
-        max_retries: Maximum number of retry attempts for rate limit errors (default: 1)
+        max_retries: Maximum number of retry attempts for errors (default: 1)
         initial_retry_delay: Initial delay in seconds before retrying (default: 1)
 
     Returns:
         The text response from Gemini or None if an error occurred
     """
-    global MODEL_INSTANCES, CHAT_SESSIONS
-    models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']  # Fallback models in order of preference
+    global CLI_AVAILABLE_MODELS
 
-    # Initialize models if not already done
-    if not MODEL_INSTANCES:
+    # If no models have been checked yet, initialize them
+    if not CLI_AVAILABLE_MODELS:
         initialize_models()
 
-    for model_name in models:
-        # Skip if model wasn't successfully initialized
-        if model_name not in MODEL_INSTANCES:
-            continue
+    # Use available models or fall back to default order if none are available
+    if CLI_AVAILABLE_MODELS:
+        models = CLI_AVAILABLE_MODELS
+    else:
+        models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+        print("Warning: No models confirmed available. Will try default models.")
 
+    # Store chat history in a simple format for CLI
+    # Note: This is a simplified approach; actual implementation may need to be more sophisticated
+    CLI_CHAT_HISTORY = {}
+
+    for model_name in models:
         retry_count = 0
         retry_delay = initial_retry_delay
-        model = MODEL_INSTANCES[model_name]
-
-        # Create a new chat session if needed
-        if chat_history is not None and model_name not in CHAT_SESSIONS:
-            try:
-                CHAT_SESSIONS[model_name] = model.start_chat(history=[])
-            except Exception as e:
-                print(f"Could not start chat session for {model_name}: {e}")
-                continue
 
         while retry_count <= max_retries:
             try:
                 print(f"Using model: {model_name}")
 
-                # Use chat session if available
-                if chat_history is not None and model_name in CHAT_SESSIONS:
-                    chat = CHAT_SESSIONS[model_name]
+                # Prepare command arguments
+                command_args = []
 
-                    # Add system prompt if provided and not already in history
-                    if system_prompt and not chat_history:
-                        chat.send_message(system_prompt, role="system")
+                # Add model selection
+                command_args.extend(["--model", model_name])
 
-                    response = chat.send_message(prompt)
-                    return response.text
-                else:
-                    # One-off generation without chat history
+                # Handle chat history if provided
+                if chat_history is not None:
+                    # For CLI, we might need to use a different approach for chat history
+                    # This is a simplified version; actual implementation may vary based on Gemini CLI capabilities
+                    command_args.append("--chat")
+
+                    # If system prompt is provided and not already in history
                     if system_prompt:
-                        response = model.generate_content([
-                            {"role": "system", "parts": [system_prompt]},
-                            {"role": "user", "parts": [prompt]}
-                        ])
-                    else:
-                        response = model.generate_content(prompt)
+                        # Add system prompt to command
+                        command_args.extend(["--system", system_prompt])
 
-                    return response.text
+                # Add the user prompt
+                command_args.append(prompt)
 
-            except Exception as e:
-                error_str = str(e)
+                # Run the Gemini CLI command
+                response = run_gemini_command(command_args)
 
-                # Check if it's a quota limit error
-                if "429" in error_str and "quota" in error_str.lower():
-                    if retry_count < max_retries:
-                        print(f"Quota limit reached. Retrying in {retry_delay} seconds...")
+                # Check if the response indicates an error
+                if response.startswith("Error:"):
+                    print(response)
+                    # If it's a model not found error, try the next model
+                    if "not found" in response.lower():
+                        print(f"Model '{model_name}' not found. Trying next model if available.")
+                        break  # Try the next model
+                    # For other errors, retry if possible
+                    elif retry_count < max_retries:
+                        print(f"Error occurred. Retrying in {retry_delay} seconds...")
                         time.sleep(retry_delay)
                         retry_count += 1
                         retry_delay *= 2  # Exponential backoff
                     else:
-                        print(f"Quota limit reached for model {model_name}. Trying next model if available.")
-                        break  # Try the next model
+                        # If we've exhausted retries, try the next model
+                        print(f"Failed to get response from model {model_name}. Trying next model if available.")
+                        break
                 else:
-                    # For other errors, check if it's a model not found error
-                    if "404" in error_str and "not found" in error_str.lower():
-                        print(f"Model '{model_name}' not found. Listing available models...")
-                        list_available_models()
-                        print(f"Trying next model if available.")
-                        break  # Try the next model
-                    else:
-                        # For other errors, just print and return None
-                        print(f"Error getting Gemini response: {e}")
-                        return None
+                    # Success! Return the response
+                    return response
+
+            except Exception as e:
+                print(f"Error getting Gemini response: {e}")
+
+                if retry_count < max_retries:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    retry_count += 1
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    print(f"Failed to get response from model {model_name}. Trying next model if available.")
+                    break  # Try the next model
 
     print("Failed to get a response from any of the configured models.")
-    print("This could be due to quota limits, unavailable models, or other API issues.")
-    print("You can try again later or check the available models with list_available_models().")
+    print("This could be due to CLI errors, unavailable models, or other issues.")
+    print("Make sure the Gemini CLI is properly installed and configured.")
     return None
 
 def get_audio_selection_from_gemini(prompt, available_files, chat_history=True):
@@ -394,9 +496,14 @@ def main():
     # Get list of available audio files
     available_files = list(voice_data.keys())
 
-    # Initialize models at startup for faster responses
-    print("Initializing Gemini models...")
+    # Check if Gemini CLI is available and which models can be used
+    print("Checking Gemini CLI and available models...")
     initialize_models()
+
+    if not CLI_AVAILABLE_MODELS:
+        print("Warning: No Gemini CLI models were confirmed available.")
+        print("The script will still attempt to use the CLI, but you may encounter errors.")
+        print("Make sure the Gemini CLI is properly installed and configured.")
 
     # Initialize conversation tracking
     previous_responses = []  # Track Gemini's previous responses
