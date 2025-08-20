@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Voice Interface</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* Additional styles specific to this page */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .chat-container {
+            flex: 1;
+            padding: 20px;
+            min-height: 400px;
+            max-height: 600px;
+            overflow-y: auto;
+            border-bottom: 1px solid #eee;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+
+        .gemini-message {
+            background-color: #f1f1f1;
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+        }
+
+        .controls {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .mode-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .mode-btn {
+            padding: 8px 15px;
+            background-color: #f1f1f1;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background-color: #4285f4;
+            color: white;
+            border-color: #4285f4;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 24px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        #user-input:focus {
+            border-color: #4285f4;
+            box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+        }
+
+        .action-btn {
+            padding: 12px 20px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 24px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .action-btn:hover {
+            background-color: #3367d6;
+        }
+
+        .action-btn:disabled {
+            background-color: #b3b3b3;
+            cursor: not-allowed;
+        }
+
+        .mic-btn {
+            background-color: #ea4335;
+        }
+
+        .mic-btn:hover {
+            background-color: #d62516;
+        }
+
+        .mic-btn.recording {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                background-color: #ea4335;
+            }
+            50% {
+                background-color: #ff6b6b;
+            }
+            100% {
+                background-color: #ea4335;
+            }
+        }
+
+        .status {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gemini Voice Interface</h1>
+        </header>
+
+        <div class="main-content">
+            <div class="character-container" id="character-container">
+                <!-- Placeholder for future 3D character -->
+                <span>L</span>
+                <!-- Canvas for future 3D character rendering -->
+                <canvas id="character-canvas" style="display: none;"></canvas>
+            </div>
+
+            <div class="chat-container" id="chat-container">
+                <!-- Messages will be added here dynamically -->
+            </div>
+
+            <div class="controls">
+                <div class="mode-selector" id="mode-selector">
+                    <!-- Mode buttons will be added here dynamically -->
+                </div>
+
+                <div class="input-container">
+                    <input type="text" id="user-input" placeholder="Type your message..." disabled>
+                    <button class="action-btn" id="send-btn" disabled>Send</button>
+                    <button class="action-btn mic-btn" id="mic-btn" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 1a2 2 0 0 1 2 2v4a2 2 0 1 1-4 0V3a2 2 0 0 1 2-2zm6 6a.5.5 0 0 1 .5.5v1a6.5 6.5 0 0 1-13 0v-1a.5.5 0 0 1 1 0v1a5.5 5.5 0 0 0 11 0v-1a.5.5 0 0 1 .5-.5z"/>
+                            <path d="M8 0a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3z"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="status" id="status">Initializing system...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script for future 3D character implementation -->
+    <script src="/static/character.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM elements
+            const chatContainer = document.getElementById('chat-container');
+            const modeSelector = document.getElementById('mode-selector');
+            const userInput = document.getElementById('user-input');
+            const sendBtn = document.getElementById('send-btn');
+            const micBtn = document.getElementById('mic-btn');
+            const statusEl = document.getElementById('status');
+
+            // State variables
+            let currentMode = null;
+            let isRecording = false;
+            let recognition = null;
+
+            // Initialize the application
+            initializeApp();
+
+            // Check if 3D character can be supported in the future
+            if (window.GeminiCharacter && window.GeminiCharacter.initializeCharacter) {
+                const canSupportCharacter = window.GeminiCharacter.initializeCharacter();
+                if (canSupportCharacter) {
+                    console.log('This browser supports WebGL. 3D character can be implemented in the future.');
+                    // Add a data attribute to the character container for future use
+                    document.querySelector('.character-container').setAttribute('data-supports-3d', 'true');
+                }
+            }
+
+            // Event listeners
+            sendBtn.addEventListener('click', sendMessage);
+            userInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+
+            micBtn.addEventListener('click', toggleSpeechRecognition);
+
+            // Functions
+            async function initializeApp() {
+                try {
+                    const response = await fetch('/api/init', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        statusEl.textContent = data.message;
+
+                        // Create mode buttons
+                        data.modes.forEach(mode => {
+                            const btn = document.createElement('button');
+                            btn.className = 'mode-btn';
+                            btn.textContent = mode.name;
+                            btn.dataset.modeId = mode.id;
+                            btn.addEventListener('click', () => setMode(mode.id));
+                            modeSelector.appendChild(btn);
+                        });
+
+                        // Add a welcome message
+                        addMessage('Welcome to Gemini Voice Interface! Please select a mode to begin.', 'gemini');
+                    } else {
+                        statusEl.textContent = `Error: ${data.message}`;
+                    }
+                } catch (error) {
+                    statusEl.textContent = `Error initializing: ${error.message}`;
+                    console.error('Initialization error:', error);
+                }
+            }
+
+            async function setMode(modeId) {
+                try {
+                    const response = await fetch('/api/set_mode', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ mode: parseInt(modeId) })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        currentMode = parseInt(modeId);
+
+                        // Update UI
+                        document.querySelectorAll('.mode-btn').forEach(btn => {
+                            btn.classList.remove('active');
+                            if (parseInt(btn.dataset.modeId) === currentMode) {
+                                btn.classList.add('active');
+                            }
+                        });
+
+                        // Enable input controls
+                        userInput.disabled = false;
+                        sendBtn.disabled = false;
+                        micBtn.disabled = false;
+
+                        // Show mode-specific message
+                        let modeMessage = `Mode ${modeId} activated: `;
+                        switch(modeId) {
+                            case 1:
+                                modeMessage += 'Gemini will select audio directly.';
+                                break;
+                            case 2:
+                                modeMessage += 'Text matching with voice data.';
+                                break;
+                            case 5:
+                                modeMessage += 'Speech recognition mode. Click the microphone to speak.';
+                                break;
+                            case 6:
+                                modeMessage += 'Text-only mode. No audio will be played.';
+                                break;
+                            case 7:
+                                modeMessage += 'RAG mode for efficient token usage.';
+                                break;
+                            case 8:
+                                modeMessage += 'Speech RAG mode. Click the microphone to speak.';
+                                break;
+                        }
+
+                        addMessage(modeMessage, 'gemini');
+                        statusEl.textContent = data.message;
+                    } else {
+                        statusEl.textContent = `Error: ${data.message}`;
+                    }
+                } catch (error) {
+                    statusEl.textContent = `Error setting mode: ${error.message}`;
+                    console.error('Mode setting error:', error);
+                }
+            }
+
+            async function sendMessage() {
+                const message = userInput.value.trim();
+
+                if (!message) return;
+
+                // Add user message to chat
+                addMessage(message, 'user');
+
+                // Clear input
+                userInput.value = '';
+
+                // Disable controls while processing
+                userInput.disabled = true;
+                sendBtn.disabled = true;
+                micBtn.disabled = true;
+                statusEl.textContent = 'Processing...';
+
+                try {
+                    const response = await fetch('/api/send_message', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ message })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        // Add Gemini's response to chat
+                        addMessage(data.response, 'gemini');
+
+                        // If there's an audio file, play it
+                        if (data.audio_file) {
+                            statusEl.textContent = `Playing audio: ${data.audio_file}`;
+
+                            // Create audio element
+                            const audio = new Audio(`/audio/${data.audio_file}`);
+
+                            // Add event listeners for future character animation
+                            audio.addEventListener('play', function() {
+                                // Hook for future 3D character speaking animation
+                                if (window.GeminiCharacter && window.character) {
+                                    window.character.speak(audio.duration * 1000);
+                                }
+                            });
+
+                            audio.addEventListener('ended', function() {
+                                // Hook for future 3D character idle animation
+                                if (window.GeminiCharacter && window.character) {
+                                    window.character.idle();
+                                }
+                                statusEl.textContent = 'Ready';
+                            });
+
+                            audio.play();
+                        } else {
+                            statusEl.textContent = 'Ready';
+                        }
+                    } else {
+                        statusEl.textContent = `Error: ${data.message}`;
+                        addMessage(`Error: ${data.message}`, 'gemini');
+                    }
+                } catch (error) {
+                    statusEl.textContent = `Error sending message: ${error.message}`;
+                    addMessage(`Error: ${error.message}`, 'gemini');
+                    console.error('Message sending error:', error);
+                } finally {
+                    // Re-enable controls
+                    userInput.disabled = false;
+                    sendBtn.disabled = false;
+                    micBtn.disabled = false;
+                    userInput.focus();
+                }
+            }
+
+            function addMessage(text, sender) {
+                const messageEl = document.createElement('div');
+                messageEl.className = `message ${sender}-message`;
+                messageEl.textContent = text;
+
+                chatContainer.appendChild(messageEl);
+
+                // Scroll to bottom
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+
+            function toggleSpeechRecognition() {
+                if (!isRecording) {
+                    startSpeechRecognition();
+                } else {
+                    stopSpeechRecognition();
+                }
+            }
+
+            function startSpeechRecognition() {
+                // Check if speech recognition is supported
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                    statusEl.textContent = 'Speech recognition not supported in this browser.';
+                    return;
+                }
+
+                // Create speech recognition object
+                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.lang = 'ja-JP';  // Set language to Japanese
+                recognition.continuous = false;
+                recognition.interimResults = false;
+
+                recognition.onstart = function() {
+                    isRecording = true;
+                    micBtn.classList.add('recording');
+                    statusEl.textContent = 'Listening...';
+                };
+
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    userInput.value = transcript;
+                    stopSpeechRecognition();
+
+                    // Send the message after a short delay
+                    setTimeout(sendMessage, 500);
+                };
+
+                recognition.onerror = function(event) {
+                    console.error('Speech recognition error', event.error);
+                    statusEl.textContent = `Speech recognition error: ${event.error}`;
+                    stopSpeechRecognition();
+                };
+
+                recognition.onend = function() {
+                    stopSpeechRecognition();
+                };
+
+                // Start recognition
+                recognition.start();
+            }
+
+            function stopSpeechRecognition() {
+                if (recognition) {
+                    recognition.stop();
+                    recognition = null;
+                }
+
+                isRecording = false;
+                micBtn.classList.remove('recording');
+                statusEl.textContent = 'Ready';
+            }
+        });
+    </script>
+</body>
+</html>

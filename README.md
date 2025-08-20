@@ -47,6 +47,8 @@ All conversations with Gemini are automatically logged to a `Log.txt` file for f
 
 ## Usage
 
+### Command Line Interface
+
 1. Run the script:
    ```
    python play_voice_with_gemini.py
@@ -55,6 +57,23 @@ All conversations with Gemini are automatically logged to a `Log.txt` file for f
 3. Continue the conversation with Gemini in a continuous chat session
 4. Type or say 'quit' to exit or 'change mode' to select a different mode
 5. All conversations are automatically logged to `Log.txt` in the same directory
+
+### Web Interface (New!)
+
+A web-based graphical user interface is now available:
+
+1. Install Flask:
+   ```
+   pip install flask
+   ```
+2. Run the web interface:
+   ```
+   python web_interface.py
+   ```
+3. Open your browser and navigate to `http://localhost:5000`
+4. Select a mode and start interacting with Gemini through the web interface
+
+For detailed instructions on using the web interface, see [README_WEB.md](README_WEB.md).
 
 ### Mode 1: Direct Selection
 
