@@ -35,7 +35,7 @@ A typical implementation might include:
 
 ```
 models/
-  ├── lacia/                  # Character name
+  ├── pneuma/                  # Character name
   │   ├── model.glb           # Main model file
   │   ├── textures/           # Texture files
   │   │   ├── diffuse.png

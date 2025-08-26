@@ -74,8 +74,10 @@ import json
 import tempfile
 import re
 import math
+import base64
 from pathlib import Path
 from dotenv import load_dotenv
+from zyphra import ZyphraClient
 
 # Load environment variables from .env file
 load_dotenv()
@@ -103,8 +105,33 @@ def run_gemini_command(command_args):
         # Get the Gemini CLI path from environment variable or use default
         gemini_cli_path = os.getenv('GEMINI_CLI_PATH', "C:\\Users\\seiri\\AppData\\Roaming\\npm\\gemini.cmd")
 
+        # Filter out any duplicate or undashed parameters
+        # This prevents both dashed and undashed versions of the same parameter from being passed
+        filtered_args = []
+        skip_next = False
+        for i, arg in enumerate(command_args):
+            if skip_next:
+                skip_next = False
+                continue
+
+            # Skip undashed parameter names that have dashed equivalents
+            if i < len(command_args) - 1 and arg in ["temperature", "maxOutputTokens", "topK", "topP"]:
+                skip_next = True
+                continue
+
+            # Skip undashed parameters that might be passed without values
+            if arg in ["temperature", "maxOutputTokens", "topK", "topP"]:
+                continue
+
+            # Skip dashed parameters that aren't supported by the CLI
+            if arg in ["--temperature", "--max-output-tokens", "--top-k", "--top-p"]:
+                skip_next = True
+                continue
+
+            filtered_args.append(arg)
+
         # Create the Gemini CLI command as a list
-        command = [gemini_cli_path] + command_args
+        command = [gemini_cli_path] + filtered_args
 
         # Run the command
         result = subprocess.run(
@@ -127,6 +154,11 @@ def run_gemini_command(command_args):
 # Path to the voice data CSV and voice directory
 VOICE_DATA_CSV = "voiceData.csv"
 VOICE_DIR = "Voice"
+CLONE_VOICE_DIR = os.path.join(VOICE_DIR, "CloneVoice")
+
+# Create necessary directories if they don't exist
+os.makedirs(VOICE_DIR, exist_ok=True)
+os.makedirs(CLONE_VOICE_DIR, exist_ok=True)
 
 def load_system_prompt():
     """
@@ -225,17 +257,573 @@ def create_voice_data_json(voice_data):
 def play_audio(filename):
     """Play the specified audio file."""
     try:
-        file_path = os.path.join(VOICE_DIR, filename)
-        if os.path.exists(file_path):
-            print(f"Playing: {filename}")
-            sound = pygame.mixer.Sound(file_path)
-            sound.play()
-            # Wait for the audio to finish playing
-            pygame.time.wait(int(sound.get_length() * 1000))
+        # Check if the filename is an absolute path or just a filename
+        if os.path.isabs(filename):
+            file_path = filename
         else:
-            print(f"Audio file not found: {file_path}")
+            file_path = os.path.join(VOICE_DIR, filename)
+
+        # Check if the file exists
+        if os.path.exists(file_path):
+            print(f"Playing: {os.path.basename(file_path)}")
+            try:
+                sound = pygame.mixer.Sound(file_path)
+                sound.play()
+                # Wait for the audio to finish playing
+                pygame.time.wait(int(sound.get_length() * 1000))
+            except Exception as sound_error:
+                print(f"Error playing sound: {sound_error}")
+                # Try alternative method if pygame fails
+                try:
+                    import winsound
+                    print("Trying to play with winsound...")
+                    winsound.PlaySound(file_path, winsound.SND_FILENAME)
+                except Exception as winsound_error:
+                    print(f"Error playing with winsound: {winsound_error}")
+        else:
+            # Try to find the file in the current working directory
+            cwd_path = os.path.join(os.getcwd(), os.path.basename(filename))
+            if os.path.exists(cwd_path):
+                print(f"Found audio file in current directory: {cwd_path}")
+                return play_audio(cwd_path)  # Recursive call with absolute path
+            else:
+                print(f"Audio file not found: {file_path}")
+                print(f"Current working directory: {os.getcwd()}")
+                print(f"Checking if file exists in Voice directory...")
+                voice_files = os.listdir(VOICE_DIR)
+                print(f"Files in Voice directory: {voice_files[:10]}...")
     except Exception as e:
         print(f"Error playing audio: {e}")
+
+def preprocess_text_for_zonos(text):
+    """
+    Preprocess text before sending to Zonos API.
+
+    This function:
+    1. Removes or replaces special characters that might cause issues
+    2. Limits text length to a reasonable size
+    3. Formats the text for better TTS results
+
+    Args:
+        text: The text to preprocess
+
+    Returns:
+        Preprocessed text
+    """
+    if not text:
+        return text
+
+    # Replace multiple newlines with a single one
+    text = re.sub(r'\n+', '\n', text)
+
+    # Replace multiple spaces with a single one
+    text = re.sub(r' +', ' ', text)
+
+    # Remove special characters that might cause issues (keep Japanese characters)
+    text = re.sub(r'[^\w\s\.,;:!?。、；：！？「」『』（）\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', '', text)
+
+    # Limit text length (3000 characters should be safe)
+    if len(text) > 3000:
+        print(f"テキストが長すぎるため切り詰めます: {len(text)} → 3000文字")
+        text = text[:2997] + "..."
+
+    return text.strip()
+
+def detect_language_from_system_prompt(system_prompt=None):
+    """
+    Detect the language from the system prompt.
+
+    Args:
+        system_prompt: The system prompt text
+
+    Returns:
+        A tuple of (language_code, language_name)
+        language_code: ISO language code (e.g., 'ja', 'en')
+        language_name: Human-readable language name (e.g., 'Japanese', 'English')
+    """
+    if not system_prompt:
+        # Try to load the system prompt if not provided
+        system_prompt = load_system_prompt()
+
+    if not system_prompt:
+        # Default to Japanese if no system prompt is available
+        return 'ja', 'Japanese'
+
+    # Count characters in different scripts
+    japanese_chars = sum(1 for c in system_prompt if ord(c) >= 0x3000 and ord(c) <= 0x9FFF)
+    english_chars = sum(1 for c in system_prompt if ord(c) >= 0x0020 and ord(c) <= 0x007F)
+
+    # Calculate percentages
+    total_chars = len(system_prompt)
+    japanese_percentage = japanese_chars / total_chars * 100 if total_chars > 0 else 0
+    english_percentage = english_chars / total_chars * 100 if total_chars > 0 else 0
+
+    print(f"Language detection: Japanese {japanese_percentage:.1f}%, English {english_percentage:.1f}%")
+
+    # Determine the dominant language
+    if japanese_percentage > 15:  # Even a small percentage of Japanese characters indicates Japanese content
+        return 'ja', 'Japanese'
+    elif english_percentage > 50:
+        return 'en', 'English'
+    else:
+        # Default to Japanese for other cases
+        return 'ja', 'Japanese'
+
+def generate_zonos_voice_data(text, voice_id="default", use_clone_voice=False, clone_voice_file=None, max_retries=3, language_code=None, system_prompt=None):
+    """
+    Generate voice data using Zonos API via the Zyphra client library.
+    This function handles only the API call to generate the audio data.
+
+    Args:
+        text: Text to convert to speech
+        voice_id: Zonos voice ID to use (default will be used if not specified)
+        use_clone_voice: Whether to use a clone voice
+        clone_voice_file: The filename of the clone voice to use
+        max_retries: Maximum number of retry attempts for transient errors
+        language_code: ISO language code (e.g., 'ja', 'en') to use for TTS
+        system_prompt: The system prompt to use for language detection if language_code is not provided
+
+    Returns:
+        Audio data as bytes or None if generation failed
+    """
+    try:
+        # Log the original text from Gemini
+        print(f"\n===== Gemini Response Text (Before Preprocessing) =====")
+        print(f"Length: {len(text)} characters")
+        print(f"Text: {text[:500]}..." if len(text) > 500 else f"Text: {text}")
+
+        # Preprocess the text before sending to Zonos
+        processed_text = preprocess_text_for_zonos(text)
+
+        # Log the preprocessed text
+        if processed_text != text:
+            print(f"\n===== Preprocessed Text for Zonos =====")
+            print(f"Length: {len(processed_text)} characters")
+            print(f"Text: {processed_text[:500]}..." if len(processed_text) > 500 else f"Text: {processed_text}")
+
+        # Log to file for later analysis
+        log_gemini_response_for_tts(text, processed_text)
+
+        # Use the preprocessed text for the rest of the function
+        text = processed_text
+
+        # Validate the text before sending to Zonos
+        is_valid, validation_message = validate_zonos_text(text)
+        if not is_valid:
+            print(f"テキスト検証エラー: {validation_message}")
+            return None
+
+        # Get API key from environment variables
+        api_key = os.getenv('ZONOS_API')
+        if not api_key:
+            print("Zonos API key not found in environment variables")
+            return None
+
+        # Initialize the Zyphra client
+        client = ZyphraClient(api_key=api_key)
+
+        # Prepare parameters for the API call
+        params = {
+            "text": text,
+            "speaking_rate": 15,
+            "model": "zonos-v0.1-transformer"
+        }
+
+        # Determine the language to use
+        detected_language_code = None
+
+        # Use provided language_code if available
+        if language_code:
+            detected_language_code = language_code
+            print(f"Using provided language code: {language_code}")
+        # Otherwise detect from system prompt
+        elif system_prompt:
+            detected_language_code, language_name = detect_language_from_system_prompt(system_prompt)
+            print(f"Detected language from system prompt: {language_name} ({detected_language_code})")
+        # Otherwise detect from text content
+        else:
+            # Check for Japanese characters in the text
+            has_japanese = any(ord(c) >= 0x3000 for c in text)
+            detected_language_code = 'ja' if has_japanese else 'en'
+            print(f"Detected language from text content: {'Japanese' if has_japanese else 'English'} ({detected_language_code})")
+
+        # Apply language-specific settings
+        if detected_language_code == 'ja':
+            print("Using Japanese language settings with hybrid model")
+            params["model"] = "zonos-v0.1-hybrid"
+            params["language_iso_code"] = "ja"
+            # Japanese performs better with higher speaking rates
+            params["speaking_rate"] = 18
+        elif detected_language_code == 'en':
+            print("Using English language settings with transformer model")
+            params["model"] = "zonos-v0.1-transformer"
+            params["language_iso_code"] = "en"
+            params["speaking_rate"] = 15
+        else:
+            # Default to hybrid model for other languages
+            print(f"Using default settings for language: {detected_language_code}")
+            params["model"] = "zonos-v0.1-hybrid"
+            params["language_iso_code"] = detected_language_code
+            params["speaking_rate"] = 15
+
+        # Initialize variables for retry loop
+        retry_count = 0
+        success = False
+        last_error = None
+        audio_data = None
+
+        # Retry loop for transient errors
+        while retry_count < max_retries and not success:
+            try:
+                if retry_count > 0:
+                    # Add exponential backoff delay for retries
+                    delay = 2 ** retry_count  # 2, 4, 8 seconds
+                    print(f"Retry attempt {retry_count}/{max_retries} after {delay} seconds...")
+                    time.sleep(delay)
+
+                # If using a clone voice, prepare the clone voice file
+                if use_clone_voice and clone_voice_file:
+                    clone_voice_path = os.path.join(CLONE_VOICE_DIR, clone_voice_file)
+                    if os.path.exists(clone_voice_path):
+                        # Read and encode the clone voice file
+                        with open(clone_voice_path, "rb") as f:
+                            clone_audio_data = f.read()
+                            speaker_audio = base64.b64encode(clone_audio_data).decode('utf-8')
+
+                        # Add to parameters
+                        params["speaker_audio"] = speaker_audio
+
+                        # For better results with cloned voices
+                        params["vqscore"] = 0.7  # Controls voice quality vs. speaker similarity
+                        params["speaker_noised"] = True  # Improves stability
+
+                        print(f"Using clone voice: {clone_voice_file}")
+                    else:
+                        print(f"Clone voice file not found: {clone_voice_path}")
+
+                # Print debug information
+                print(f"Zyphra client parameters: {params}")
+
+                # Make the API call using the client library
+                audio_data = client.audio.speech.create(**params)
+                success = True
+
+            except Exception as e:
+                retry_count += 1
+                last_error = str(e)
+                print(f"Error on attempt {retry_count}/{max_retries}: {e}")
+
+                # Check if we should retry
+                if retry_count >= max_retries:
+                    raise Exception(f"Max retries ({max_retries}) exceeded. Last error: {last_error}")
+
+        # Return the audio data
+        if audio_data:
+            print(f"Zyphra client response successful, audio data size: {len(audio_data)} bytes")
+            return audio_data
+        else:
+            print("No audio data received from Zyphra client")
+            return None
+
+    except Exception as e:
+        error_message = f"Error generating voice with Zyphra client: {e}"
+        print(error_message)
+
+        # Get detailed traceback for logging
+        import traceback
+        traceback_str = traceback.format_exc()
+
+        # Log the error with traceback
+        error_info = f"GENERAL ERROR:\n{error_message}\n\nTraceback:\n{traceback_str}"
+        log_gemini_response_for_tts(gemini_response=text, processed_text=processed_text, error_info=error_info)
+
+        return None
+
+def save_zonos_voice_data(audio_data, text):
+    """
+    Save the generated audio data to a file and update the voice data CSV.
+
+    Args:
+        audio_data: The audio data as bytes
+        text: The text content of the audio
+
+    Returns:
+        The filename of the saved audio file or None if saving failed
+    """
+    try:
+        if not audio_data:
+            print("No audio data to save")
+            return None
+
+        # Generate a filename with sequential numbering
+        next_number = get_next_audio_number()
+        filename = f"audio{next_number}.webm"
+        file_path = os.path.join(VOICE_DIR, filename)
+
+        print(f"Saving audio data to: {file_path}")
+
+        # Save audio file
+        with open(file_path, "wb") as f:
+            f.write(audio_data)
+
+        # Update voice data CSV
+        update_voice_data_csv(filename, text)
+
+        return filename
+    except Exception as e:
+        print(f"Error saving audio data: {e}")
+        return None
+
+def generate_zonos_voice(text, voice_id="default", use_clone_voice=False, clone_voice_file=None, max_retries=3, language_code=None, system_prompt=None):
+    """
+    Generate voice using Zonos API via the Zyphra client library.
+    This is a wrapper function that combines generate_zonos_voice_data and save_zonos_voice_data.
+
+    Args:
+        text: Text to convert to speech
+        voice_id: Zonos voice ID to use (default will be used if not specified)
+        use_clone_voice: Whether to use a clone voice
+        clone_voice_file: The filename of the clone voice to use
+        max_retries: Maximum number of retry attempts for transient errors
+        language_code: ISO language code (e.g., 'ja', 'en') to use for TTS
+        system_prompt: The system prompt to use for language detection if language_code is not provided
+
+    Returns:
+        Path to the generated audio file or None if generation failed
+    """
+    # If system_prompt is not provided, try to load it
+    if not system_prompt and not language_code:
+        system_prompt = load_system_prompt()
+
+    # Generate the audio data
+    audio_data = generate_zonos_voice_data(
+        text, 
+        voice_id=voice_id, 
+        use_clone_voice=use_clone_voice, 
+        clone_voice_file=clone_voice_file, 
+        max_retries=max_retries,
+        language_code=language_code,
+        system_prompt=system_prompt
+    )
+
+    # If we have audio data, save it to a file
+    if audio_data:
+        return save_zonos_voice_data(audio_data, text)
+    else:
+        return None
+
+def test_zonos_connection():
+    """
+    Test the connection to the Zonos API and verify that the API key is valid using the Zyphra client library.
+
+    Returns:
+        bool: True if the connection is successful, False otherwise
+        str: A message describing the result of the test
+    """
+    try:
+        # Get API key from environment variables
+        api_key = os.getenv('ZONOS_API')
+        if not api_key:
+            return False, "Zonos APIキーが環境変数に見つかりません"
+
+        # Minimal parameters for test
+        params = {
+            "text": "テスト",
+            "speaking_rate": 15,
+            "model": "zonos-v0.1-transformer"
+        }
+
+        # Print test information
+        print(f"Zyphra クライアント接続テスト")
+        print(f"パラメータ: {params}")
+
+        try:
+            # Initialize the Zyphra client
+            client = ZyphraClient(api_key=api_key)
+
+            # Make a simple API call to test the connection
+            # We don't need to save the result, just check if it works
+            audio_data = client.audio.speech.create(**params)
+
+            # If we get here, the connection was successful
+            print(f"Zyphra クライアント接続テスト成功")
+            print(f"オーディオデータサイズ: {len(audio_data)} バイト")
+
+            return True, "Zonos APIへの接続に成功しました"
+
+        except Exception as client_error:
+            error_message = str(client_error)
+            print(f"Zyphra クライアントエラー: {error_message}")
+
+            # Check for common error types
+            if "401" in error_message or "unauthorized" in error_message.lower():
+                return False, "認証エラー: APIキーが無効です"
+            elif "404" in error_message or "not found" in error_message.lower():
+                return False, "エンドポイントが見つかりません: APIエンドポイントが正しいか確認してください"
+            elif "429" in error_message or "too many requests" in error_message.lower():
+                return False, "レート制限エラー: APIリクエストの頻度を下げてください"
+            else:
+                return False, f"Zyphra クライアントエラー: {error_message}"
+
+    except Exception as e:
+        return False, f"予期せぬエラー: {e}"
+
+def validate_zonos_text(text):
+    """
+    Validate text to be sent to the Zonos API.
+
+    Args:
+        text: The text to validate
+
+    Returns:
+        bool: True if the text is valid, False otherwise
+        str: A message describing the result of the validation
+    """
+    if not text:
+        return False, "テキストが空です"
+
+    if len(text) > 5000:  # Arbitrary limit, check API documentation for actual limit
+        return False, f"テキストが長すぎます ({len(text)} 文字). 5000文字以下にしてください"
+
+    # Check for special characters or control characters
+    invalid_chars = [char for char in text if ord(char) < 32 and char not in ['\n', '\t', '\r']]
+    if invalid_chars:
+        return False, f"テキストに無効な制御文字が含まれています: {invalid_chars}"
+
+    return True, "テキストは有効です"
+
+def get_available_clone_voices():
+    """
+    Get a list of available clone voices from the CloneVoice directory.
+
+    Returns:
+        A list of dictionaries containing voice information
+    """
+    voices = []
+    try:
+        # Check if the directory exists
+        if not os.path.exists(CLONE_VOICE_DIR):
+            return voices
+
+        # Get all files in the directory
+        for filename in os.listdir(CLONE_VOICE_DIR):
+            file_path = os.path.join(CLONE_VOICE_DIR, filename)
+            # Only include files, not directories
+            if os.path.isfile(file_path):
+                # Get the file extension
+                _, ext = os.path.splitext(filename)
+                # Only include audio files
+                if ext.lower() in ['.wav', '.mp3', '.ogg']:
+                    # Create a voice entry
+                    voice_name = os.path.splitext(filename)[0]
+                    voices.append({
+                        'id': filename,
+                        'name': voice_name
+                    })
+
+        return voices
+    except Exception as e:
+        print(f"Error getting available clone voices: {e}")
+        return []
+
+def get_next_audio_number():
+    """
+    voiceData.csvから最大の連番を見つけて、次の番号を返す
+
+    Returns:
+        int: 次に使用する連番
+    """
+    try:
+        max_number = 0
+
+        # CSVファイルが存在するか確認
+        if os.path.exists(VOICE_DATA_CSV):
+            # Try different encodings for reading the file
+            encodings = ['utf-8', 'shift-jis', 'euc-jp', 'iso-2022-jp', 'cp932']
+
+            for encoding in encodings:
+                try:
+                    with open(VOICE_DATA_CSV, 'r', encoding=encoding) as file:
+                        reader = csv.reader(file)
+                        next(reader, None)  # ヘッダーをスキップ
+
+                        for row in reader:
+                            if not row:
+                                continue
+
+                            filename = row[0]
+                            # "audio数字.拡張子" の形式からファイル番号を抽出
+                            match = re.match(r'audio(\d+)\.\w+', filename)
+                            if match:
+                                number = int(match.group(1))
+                                max_number = max(max_number, number)
+
+                    print(f"Successfully read CSV with encoding: {encoding}")
+                    break  # If we get here, we've successfully read the file
+                except UnicodeDecodeError:
+                    continue  # Try the next encoding
+                except Exception as e:
+                    print(f"Error reading CSV with encoding {encoding}: {e}")
+                    continue
+
+        # 次の番号を返す
+        return max_number + 1
+
+    except Exception as e:
+        print(f"連番取得エラー: {e}")
+        # エラーが発生した場合は、タイムスタンプを使用
+        return int(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
+
+def update_voice_data_csv(filename, text):
+    """
+    Update the voiceData.csv file with new voice data.
+
+    Args:
+        filename: Name of the audio file
+        text: Text content of the audio
+    """
+    try:
+        # Read existing data
+        existing_data = []
+        file_encoding = 'utf-8'  # Default encoding
+
+        # Try different encodings for reading the file
+        encodings = ['utf-8', 'shift-jis', 'euc-jp', 'iso-2022-jp', 'cp932']
+        file_exists = os.path.exists(VOICE_DATA_CSV)
+
+        if file_exists:
+            for encoding in encodings:
+                try:
+                    with open(VOICE_DATA_CSV, 'r', encoding=encoding) as file:
+                        reader = csv.reader(file)
+                        existing_data = list(reader)
+                    print(f"Successfully read CSV with encoding: {encoding}")
+                    file_encoding = encoding  # Remember the successful encoding
+                    break  # If we get here, we've successfully read the file
+                except UnicodeDecodeError:
+                    continue  # Try the next encoding
+                except Exception as e:
+                    print(f"Error reading CSV with encoding {encoding}: {e}")
+                    continue
+
+        # If file doesn't exist or couldn't be read with any encoding
+        if not file_exists or not existing_data:
+            # Create file with header if it doesn't exist
+            existing_data = [["filename", "text"]]
+            print("Creating new CSV file with header")
+
+        # Add new data
+        existing_data.append([filename, text])
+
+        # Write updated data using the same encoding that was successful for reading
+        with open(VOICE_DATA_CSV, 'w', encoding=file_encoding, newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(existing_data)
+
+        print(f"Updated voice data CSV with new entry: {filename} using encoding: {file_encoding}")
+
+    except Exception as e:
+        print(f"Error updating voice data CSV: {e}")
 
 def list_available_models():
     """
@@ -249,13 +837,13 @@ def list_available_models():
         # Run the CLI command to list available models
         # The exact command may vary depending on the Gemini CLI implementation
         # This is a common pattern for CLI tools
-        response = run_gemini_command(["list", "models"])
+        response = run_gemini_command(["--list", "models"])
 
         if response.startswith("Error:"):
             print(f"Error listing models: {response}")
 
             # Try alternative command format if the first one fails
-            response = run_gemini_command(["models", "list"])
+            response = run_gemini_command(["--models", "list"])
 
             if response.startswith("Error:"):
                 print(f"Error listing models with alternative command: {response}")
@@ -428,6 +1016,15 @@ def log_token_usage(prompt, response, model_name):
     Returns:
         A dictionary with token usage statistics
     """
+    # Define quota limits for different models (tokens per day)
+    # These are approximate values and may need adjustment based on actual limits
+    QUOTA_LIMITS = {
+        'gemini-2.5-pro': 60000,  # Example limit for Pro model
+        'gemini-2.5-flash': 120000,  # Example limit for Flash model
+        'gemini-pro-vision': 60000,  # Example limit for Vision model
+        'default': 60000  # Default limit for unknown models
+    }
+
     # Initialize token usage tracking if it doesn't exist
     if not hasattr(log_token_usage, 'session_stats'):
         log_token_usage.session_stats = {
@@ -439,7 +1036,9 @@ def log_token_usage(prompt, response, model_name):
             'avg_tokens_per_request': 0,
             'start_time': datetime.datetime.now(),
             'hourly_usage': {},
-            'token_savings': 0  # Track estimated token savings from optimizations
+            'daily_usage': {},
+            'token_savings': 0,  # Track estimated token savings from optimizations
+            'quota_limits': QUOTA_LIMITS  # Store quota limits
         }
 
     # Estimate tokens for prompt and response
@@ -464,6 +1063,18 @@ def log_token_usage(prompt, response, model_name):
         log_token_usage.session_stats['hourly_usage'][current_hour] = 0
     log_token_usage.session_stats['hourly_usage'][current_hour] += total_tokens
 
+    # Update daily usage
+    current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+    if current_date not in log_token_usage.session_stats['daily_usage']:
+        log_token_usage.session_stats['daily_usage'][current_date] = {}
+
+    # Initialize model usage for the day if not exists
+    if model_name not in log_token_usage.session_stats['daily_usage'][current_date]:
+        log_token_usage.session_stats['daily_usage'][current_date][model_name] = 0
+
+    # Update model usage for the day
+    log_token_usage.session_stats['daily_usage'][current_date][model_name] += total_tokens
+
     # Calculate average tokens per request
     log_token_usage.session_stats['avg_tokens_per_request'] = (
         log_token_usage.session_stats['total_tokens'] / 
@@ -484,6 +1095,19 @@ def log_token_usage(prompt, response, model_name):
         'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
+    # Calculate quota usage
+    current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+    daily_model_usage = log_token_usage.session_stats['daily_usage'].get(current_date, {}).get(model_name, 0)
+
+    # Get quota limit for the model
+    quota_limit = log_token_usage.session_stats['quota_limits'].get(
+        model_name, 
+        log_token_usage.session_stats['quota_limits']['default']
+    )
+
+    # Calculate percentage of quota used
+    quota_percentage = (daily_model_usage / quota_limit) * 100 if quota_limit > 0 else 0
+
     # Log detailed statistics
     print(f"\n===== Token Usage Statistics =====")
     print(f"Current request: {prompt_tokens} prompt + {response_tokens} response = {total_tokens} tokens")
@@ -492,6 +1116,19 @@ def log_token_usage(prompt, response, model_name):
     print(f"Estimated token savings: {log_token_usage.session_stats['token_savings']} tokens")
     print(f"Average per request: {log_token_usage.session_stats['avg_tokens_per_request']:.1f} tokens")
     print(f"Request count: {log_token_usage.session_stats['request_count']}")
+    print(f"\n===== Quota Usage ({current_date}) =====")
+    print(f"Daily usage for {model_name}: {daily_model_usage} tokens")
+    print(f"Quota limit: {quota_limit} tokens")
+    print(f"Quota used: {quota_percentage:.2f}%")
+    print(f"Remaining: {quota_limit - daily_model_usage} tokens ({100 - quota_percentage:.2f}%)")
+
+    # Update current stats with quota information
+    current_stats.update({
+        'daily_usage': daily_model_usage,
+        'quota_limit': quota_limit,
+        'quota_percentage': quota_percentage,
+        'quota_remaining': quota_limit - daily_model_usage
+    })
 
     return current_stats
 
@@ -517,8 +1154,68 @@ def get_token_usage_stats():
     for model, model_usage in usage['model_usage'].items():
         stats.append(f"  {model}: {model_usage} tokens")
 
+    # Add quota usage information if available
+    if hasattr(log_token_usage, 'session_stats') and 'daily_usage' in log_token_usage.session_stats:
+        current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+        daily_usage = log_token_usage.session_stats['daily_usage'].get(current_date, {})
+        quota_limits = log_token_usage.session_stats.get('quota_limits', {})
+
+        if daily_usage:
+            stats.append(f"\n===== Quota Usage ({current_date}) =====")
+            for model, model_usage in daily_usage.items():
+                quota_limit = quota_limits.get(model, quota_limits.get('default', 60000))
+                quota_percentage = (model_usage / quota_limit) * 100 if quota_limit > 0 else 0
+                remaining = quota_limit - model_usage
+                remaining_percentage = 100 - quota_percentage
+
+                stats.append(f"  {model}:")
+                stats.append(f"    - Daily usage: {model_usage} tokens")
+                stats.append(f"    - Quota limit: {quota_limit} tokens")
+                stats.append(f"    - Quota used: {quota_percentage:.2f}%")
+                stats.append(f"    - Remaining: {remaining} tokens ({remaining_percentage:.2f}%)")
+
     stats.append("\nNote: These are estimated values and may differ from actual token counts.")
     return "\n".join(stats)
+
+def get_quota_usage_stats():
+    """
+    Get quota usage statistics in a format suitable for the web interface.
+
+    Returns:
+        A dictionary with quota usage statistics
+    """
+    quota_stats = {
+        'models': [],
+        'current_date': datetime.datetime.now().strftime('%Y-%m-%d')
+    }
+
+    # Check if token usage tracking is initialized
+    if not hasattr(log_token_usage, 'session_stats') or 'daily_usage' not in log_token_usage.session_stats:
+        return quota_stats
+
+    current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+    daily_usage = log_token_usage.session_stats['daily_usage'].get(current_date, {})
+    quota_limits = log_token_usage.session_stats.get('quota_limits', {})
+
+    # Add quota usage information for each model
+    for model, model_usage in daily_usage.items():
+        quota_limit = quota_limits.get(model, quota_limits.get('default', 60000))
+        quota_percentage = (model_usage / quota_limit) * 100 if quota_limit > 0 else 0
+        remaining = quota_limit - model_usage
+        remaining_percentage = 100 - quota_percentage
+
+        model_stats = {
+            'name': model,
+            'daily_usage': model_usage,
+            'quota_limit': quota_limit,
+            'quota_percentage': round(quota_percentage, 2),
+            'remaining': remaining,
+            'remaining_percentage': round(remaining_percentage, 2)
+        }
+
+        quota_stats['models'].append(model_stats)
+
+    return quota_stats
 
 def reset_conversation_history():
     """
@@ -742,104 +1439,158 @@ def select_optimal_model(prompt, conversation_history=None):
 
     return result
 
-def get_gemini_response(prompt, system_prompt=None, chat_history=None, max_retries=0, initial_retry_delay=1, reset_history=False):
+def query_with_retries(models, conversation_history, preferred_model=None, system_prompt=None):
     """
-    Get a response from Gemini based on the prompt using the local Gemini CLI.
-
-    This function maintains conversation history when chat_history=True by including
-    previous exchanges in the prompt sent to Gemini. This helps create more contextual
-    and coherent conversations.
+    Wrapper function to adapt get_gemini_response to the interface expected by web_interface.py.
 
     Args:
-        prompt: The user prompt to send to Gemini
-        system_prompt: Optional system prompt to guide Gemini's response
-        chat_history: When True, includes previous conversation history in the prompt
-                     to maintain context across multiple exchanges
-        max_retries: Maximum number of retry attempts for errors (default: 0)
-        initial_retry_delay: Initial delay in seconds before retrying (default: 1)
-        reset_history: When True, resets the conversation history before processing this prompt (default: False)
+        models: The initialized models (not used directly, but kept for interface compatibility)
+        conversation_history: List of conversation messages in the format expected by web_interface.py
+        preferred_model: Optional specific model to use (default: None, which uses automatic selection)
+        system_prompt: Optional system prompt to guide Gemini's response (default: None)
 
     Returns:
-        A tuple containing:
-        - The text response from Gemini or None if an error occurred
-        - The full prompt sent to Gemini (including conversation history if used)
+        The text response from Gemini
     """
-    # Reset conversation history if requested
-    if reset_history:
-        reset_conversation_history()
+    # Extract the user's message from the conversation history
+    user_message = conversation_history[-1]["parts"][0] if conversation_history else ""
+
+    # Check if we should avoid using Pro model due to quota issues
+    avoid_pro_model = False
+    if hasattr(log_token_usage, 'session_stats') and 'daily_usage' in log_token_usage.session_stats:
+        current_date = datetime.datetime.now().strftime('%Y-%m-%d')
+        daily_usage = log_token_usage.session_stats['daily_usage'].get(current_date, {})
+        quota_limits = log_token_usage.session_stats.get('quota_limits', {})
+
+        # Check if Pro model is close to or has exceeded its quota
+        pro_model = 'gemini-2.5-pro'
+        if pro_model in daily_usage:
+            pro_usage = daily_usage[pro_model]
+            pro_limit = quota_limits.get(pro_model, quota_limits.get('default', 60000))
+            pro_percentage = (pro_usage / pro_limit) * 100 if pro_limit > 0 else 0
+
+            # If Pro model has used more than 80% of its quota, avoid using it
+            if pro_percentage > 80:
+                avoid_pro_model = True
+                print(f"\n===== Avoiding {pro_model} due to high quota usage ({pro_percentage:.2f}%) =====")
+                print(f"Daily usage: {pro_usage} tokens")
+                print(f"Quota limit: {pro_limit} tokens")
+                print(f"Switching to alternative model to preserve quota.")
+
+    # Call get_gemini_response with the extracted message and conversation history
+    # If a preferred model is specified, temporarily override the automatic model selection
+    if preferred_model:
+        # If we should avoid Pro model and the preferred model is Pro, use Flash instead
+        if avoid_pro_model and preferred_model == 'gemini-2.5-pro':
+            print(f"Preferred model was {preferred_model}, but switching to gemini-2.5-flash to avoid quota issues")
+            preferred_model = 'gemini-2.5-flash'
+
+        # Save the current available models
+        global CLI_AVAILABLE_MODELS
+        original_models = CLI_AVAILABLE_MODELS.copy() if CLI_AVAILABLE_MODELS else []
+
+        # Temporarily set the preferred model as the only available model
+        CLI_AVAILABLE_MODELS = [preferred_model]
+
+        try:
+            # Call get_gemini_response with the preferred model
+            response, _ = get_gemini_response(user_message, system_prompt=system_prompt, chat_history=True)
+        finally:
+            # Restore the original available models
+            CLI_AVAILABLE_MODELS = original_models
+    else:
+        # If we should avoid Pro model, reorder the available models to try Flash first
+        if avoid_pro_model and CLI_AVAILABLE_MODELS:
+            original_models = CLI_AVAILABLE_MODELS.copy()
+            reordered_models = []
+
+            # Add Flash model first if available
+            if 'gemini-2.5-flash' in original_models:
+                reordered_models.append('gemini-2.5-flash')
+
+            # Add other models except Pro
+            for model in original_models:
+                if model != 'gemini-2.5-flash' and model != 'gemini-2.5-pro':
+                    reordered_models.append(model)
+
+            # Add Pro model last if available
+            if 'gemini-2.5-pro' in original_models:
+                reordered_models.append('gemini-2.5-pro')
+
+            # Set the reordered models
+            CLI_AVAILABLE_MODELS = reordered_models
+            print(f"Reordered models to prioritize non-Pro models: {CLI_AVAILABLE_MODELS}")
+
+            try:
+                # Use automatic model selection with reordered models
+                response, _ = get_gemini_response(user_message, system_prompt=system_prompt, chat_history=True)
+            finally:
+                # Restore the original models
+                CLI_AVAILABLE_MODELS = original_models
+        else:
+            # Use automatic model selection
+            response, _ = get_gemini_response(user_message, system_prompt=system_prompt, chat_history=True)
+
+    # Return just the response string
+    return response
+
+def get_best_matching_audio(gemini_response, voice_data):
+    """
+    Wrapper function to adapt find_best_match_text to the interface expected by web_interface.py.
+
+    Args:
+        gemini_response: The response from Gemini
+        voice_data: Dictionary mapping filenames to their text content
+
+    Returns:
+        The filename of the best matching audio file
+    """
+    # Call find_best_match_text with the Gemini response and voice data
+    return find_best_match_text(gemini_response, voice_data)
+
+def process_gemini_response(gemini_response):
+    """
+    Wrapper function to adapt get_audio_selection_from_gemini to the interface expected by web_interface.py.
+
+    This function is used in Direct mode (mode 1) to get an audio file directly from Gemini's response.
+
+    Args:
+        gemini_response: The response from Gemini
+
+    Returns:
+        The filename of the selected audio file or None if no appropriate file was found
+    """
+    # Get available files from voice_data
+    available_files = list(voice_data.keys())
+
+    # Try to get voice_data_json_path if it exists in the global scope
+    voice_data_json_path = globals().get('voice_data_json_path', None)
+
+    # Call get_audio_selection_from_gemini with the Gemini response
+    # We use an empty string as the prompt since we're processing the response, not generating one
+    return get_audio_selection_from_gemini(gemini_response, available_files, voice_data, 
+                                          chat_history=True, voice_data_json_path=voice_data_json_path)
+
+def get_gemini_response(prompt, system_prompt=None, chat_history=True, max_retries=3, initial_retry_delay=1):
+    """
+    ユーザーのプロンプトに基づいてGeminiから応答を取得します。
+    対話履歴を正しく処理するように修正されました。
+    """
     global CLI_AVAILABLE_MODELS
 
-    # If no models have been checked yet, initialize them
     if not CLI_AVAILABLE_MODELS:
         initialize_models()
 
-    # Initialize conversation history if it doesn't exist
     if not hasattr(get_gemini_response, 'CLI_CHAT_HISTORY'):
         get_gemini_response.CLI_CHAT_HISTORY = []
 
-    # Initialize token usage tracking if it doesn't exist
-    if not hasattr(get_gemini_response, 'token_usage'):
-        get_gemini_response.token_usage = {
-            'total_prompt_tokens': 0,
-            'total_response_tokens': 0,
-            'total_tokens': 0,
-            'model_usage': {}
-        }
-
-    # Dynamically select the optimal model and parameters based on prompt complexity
-    # Only if we have multiple models available
+    # 最適なモデルを動的に選択
     if len(CLI_AVAILABLE_MODELS) > 1:
-        # Get model configuration from the enhanced selection function
-        model_config = select_optimal_model(prompt, get_gemini_response.CLI_CHAT_HISTORY if chat_history else None)
-
-        # Extract model name and parameters
+        model_config = select_optimal_model(prompt, get_gemini_response.CLI_CHAT_HISTORY)
         preferred_model = model_config['model']
-        temperature = model_config.get('temperature', 0.7)
-        max_output_tokens = model_config.get('max_output_tokens', 500)
-        top_k = model_config.get('top_k', 40)
-        top_p = model_config.get('top_p', 0.9)
-
-        # Store parameters for later use
-        if not hasattr(get_gemini_response, 'model_parameters'):
-            get_gemini_response.model_parameters = {}
-
-        get_gemini_response.model_parameters = {
-            'temperature': temperature,
-            'max_output_tokens': max_output_tokens,
-            'top_k': top_k,
-            'top_p': top_p
-        }
-
-        # Reorder models to try preferred model first, but keep all models as fallbacks
-        models = [preferred_model]
-        for model in CLI_AVAILABLE_MODELS:
-            if model != preferred_model:
-                models.append(model)
-
-        print(f"Dynamically selected model: {preferred_model} with temperature={temperature:.1f}, max_tokens={max_output_tokens}")
-    # Use available models or fall back to default order if none are available
-    elif CLI_AVAILABLE_MODELS:
-        models = CLI_AVAILABLE_MODELS
-        # Use default parameters
-        get_gemini_response.model_parameters = {
-            'temperature': 0.7,
-            'max_output_tokens': 500,
-            'top_k': 40,
-            'top_p': 0.9
-        }
+        models = [preferred_model] + [m for m in CLI_AVAILABLE_MODELS if m != preferred_model]
     else:
-        models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-pro-vision']
-        # Use default parameters
-        get_gemini_response.model_parameters = {
-            'temperature': 0.7,
-            'max_output_tokens': 500,
-            'top_k': 40,
-            'top_p': 0.9
-        }
-        print("Warning: No models confirmed available. Will try default models.")
-
-    # If chat_history is True, use the stored conversation history
-    use_history = chat_history is True and hasattr(get_gemini_response, 'CLI_CHAT_HISTORY')
+        models = CLI_AVAILABLE_MODELS
 
     for model_name in models:
         retry_count = 0
@@ -847,390 +1598,72 @@ def get_gemini_response(prompt, system_prompt=None, chat_history=None, max_retri
 
         while retry_count <= max_retries:
             try:
-                print(f"Using model: {model_name}")
+                # 対話履歴とシステムプロンプトを扱うための新しい、より信頼性の高い方法
+                history_temp_file = None
+                system_temp_file = None
 
-                # Prepare command arguments
-                command_args = []
+                try:
+                    # Gemini CLIの'chat'サブコマンドを使用
+                    command_args = ["chat", "--model", model_name]
 
-                # Add model selection and parameters
-                command_args.extend(["--model", model_name])
+                    # システムプロンプトを一時ファイルに書き込み、そのパスをCLIに渡す
+                    if system_prompt:
+                        with tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8', suffix='.txt') as f:
+                            f.write(system_prompt)
+                            system_temp_file = f.name
+                        command_args.extend(["--system", system_temp_file])
 
-                # Add model parameters if available
-                if hasattr(get_gemini_response, 'model_parameters'):
-                    params = get_gemini_response.model_parameters
+                    # 対話履歴をJSON形式で一時ファイルに書き込み、そのパスをCLIに渡す
+                    if chat_history and get_gemini_response.CLI_CHAT_HISTORY:
+                        # CLIが要求する形式に変換（例：{"role": "user", "parts": [{"text": "Hello"}]}）
+                        cli_history = []
+                        for msg in get_gemini_response.CLI_CHAT_HISTORY:
+                            cli_history.append({"role": msg["role"], "parts": [{"text": msg["content"]}]})
 
-                    # Add temperature parameter
-                    if 'temperature' in params:
-                        command_args.extend(["--temperature", str(params['temperature'])])
+                        with tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8', suffix='.json') as f:
+                            json.dump(cli_history, f, ensure_ascii=False, indent=2)
+                            history_temp_file = f.name
+                        command_args.extend(["--history", history_temp_file])
 
-                    # Add max output tokens parameter
-                    if 'max_output_tokens' in params:
-                        command_args.extend(["--max-output-tokens", str(params['max_output_tokens'])])
+                    # ユーザーの現在のプロンプトを追加
+                    command_args.extend(["--text", prompt])
 
-                    # Add top-k parameter if supported by the CLI
-                    if 'top_k' in params:
-                        try:
-                            command_args.extend(["--top-k", str(params['top_k'])])
-                        except:
-                            # Some CLI versions might not support this parameter
-                            pass
-
-                    # Add top-p parameter if supported by the CLI
-                    if 'top_p' in params:
-                        try:
-                            command_args.extend(["--top-p", str(params['top_p'])])
-                        except:
-                            # Some CLI versions might not support this parameter
-                            pass
-
-                # Handle system prompt if provided
-                system_instructions = ""
-                if system_prompt:
-                    system_instructions = f"{system_prompt}\n\n"
-
-                # Prepare the prompt with conversation history if needed
-                enhanced_prompt = system_instructions + prompt
-                if use_history and get_gemini_response.CLI_CHAT_HISTORY:
-                    # Format the conversation history as part of the prompt
-
-                    # Create an ultra-optimized conversation history format to minimize token usage
-
-                    # Dynamically adjust history length based on conversation complexity
-                    # For complex conversations, keep more context; for simple ones, keep less
-                    complexity_score = 0
-
-                    # Check for complexity indicators in the prompt
-                    complexity_indicators = [
-                        "前に言った", "先ほどの", "さっきの", "以前の", "前回の",  # References to previous exchanges
-                        "それ", "あれ", "これ", "その", "あの", "この",           # Pronouns that need context
-                        "続き", "さらに", "他に", "もっと", "追加",               # Continuation indicators
-                        "なぜ", "どうして", "理由", "原因", "結果",               # Reasoning indicators
-                        "でも", "しかし", "一方", "他方", "それとも"              # Contrast indicators
-                    ]
-
-                    for indicator in complexity_indicators:
-                        if indicator in prompt:
-                            complexity_score += 1
-
-                    # Adjust max history entries based on complexity
-                    if complexity_score >= 3:
-                        max_history_entries = 4  # More context for complex conversations
-                    elif complexity_score >= 1:
-                        max_history_entries = 3  # Medium context
-                    else:
-                        max_history_entries = 2  # Less context for simple conversations
-
-                    # Get recent history based on dynamic length
-                    recent_history = get_gemini_response.CLI_CHAT_HISTORY[-max_history_entries*2:] if len(get_gemini_response.CLI_CHAT_HISTORY) > max_history_entries*2 else get_gemini_response.CLI_CHAT_HISTORY
-
-                    # Start with no header to save tokens
-                    history_text = ""
-
-                    # Add each message with ultra-minimal formatting
-                    # Dynamically adjust message length based on importance
-                    for i, msg in enumerate(recent_history):
-                        # Use U/A instead of User/AI to save tokens
-                        role_char = "U" if msg["role"] == "user" else "A"
-
-                        # Determine message importance
-                        # More recent messages and user messages get more tokens
-                        recency_factor = (i + 1) / len(recent_history)  # 0.0 to 1.0
-                        role_factor = 1.2 if msg["role"] == "user" else 1.0  # User messages slightly more important
-
-                        # Calculate dynamic message length (50-150 chars)
-                        dynamic_length = int(50 + (recency_factor * role_factor * 100))
-
-                        # Truncate content based on dynamic length
-                        content = msg["content"]
-                        if len(content) > dynamic_length:
-                            # For longer messages, keep beginning and end, remove middle
-                            if dynamic_length > 80:
-                                # Keep first 2/3 and last 1/3 of allowed length
-                                first_part = int(dynamic_length * 0.67)
-                                last_part = dynamic_length - first_part - 3  # -3 for ellipsis
-                                content = content[:first_part] + "..." + content[-last_part:]
-                            else:
-                                # For very short allowed lengths, just truncate the end
-                                content = content[:dynamic_length-3] + "..."
-
-                        # Add to history with minimal formatting
-                        # No newlines between messages to save tokens
-                        separator = "" if i == 0 else " "
-                        history_text += f"{separator}{role_char}:{content}"
-
-                    # Add the current prompt with minimal formatting
-                    # Only include system instructions if they're not too long
-                    if system_instructions and len(system_instructions) > 300:
-                        # For long system instructions, include only a summary
-                        system_summary = "You are Lacia, an AI assistant with a cool but kind personality. "
-                        enhanced_prompt = f"{system_summary}{history_text} U:{prompt} A:"
-                    else:
-                        enhanced_prompt = f"{system_instructions}{history_text} U:{prompt} A:"
-                    # Using conversation history in prompt
-
-                # Initialize response variable
-                response = None
-
-                # Check if we should try the chat subcommand
-                # We'll only try it if it hasn't failed before
-                # This is a static variable that persists across function calls
-                if not hasattr(get_gemini_response, 'CHAT_SUBCOMMAND_UNSUPPORTED'):
-                    # Initialize to False (meaning we'll try the chat subcommand)
-                    get_gemini_response.CHAT_SUBCOMMAND_UNSUPPORTED = False
-                    print("Initializing CHAT_SUBCOMMAND_UNSUPPORTED to False")
-
-                # First try to use the chat subcommand if it's available and hasn't failed before
-                # This provides better support for conversation history
-                if use_history and get_gemini_response.CLI_CHAT_HISTORY and not get_gemini_response.CHAT_SUBCOMMAND_UNSUPPORTED:
-                    chat_history_file = None
-                    system_file = None
-
-                    try:
-                        # Create a temporary file for the chat history
-                        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
-                            chat_history_file = f.name
-
-                            # Format the history as a list of messages with role and content
-                            chat_messages = []
-                            for msg in get_gemini_response.CLI_CHAT_HISTORY:
-                                chat_messages.append({
-                                    "role": msg["role"],
-                                    "content": msg["content"]
-                                })
-
-                            # Add the current message
-                            chat_messages.append({
-                                "role": "user",
-                                "content": prompt
-                            })
-
-                            # Write the messages to the file
-                            json.dump(chat_messages, f, ensure_ascii=False, indent=2)
-
-                        # Try using the chat subcommand with the history file
-                        chat_command_args = ["chat"]
-
-                        # Add model selection
-                        chat_command_args.extend(["--model", model_name])
-
-                        # Add the history file
-                        chat_command_args.extend(["--history", chat_history_file])
-
-                        # Add system instructions if provided
-                        if system_instructions:
-                            # Create a temporary file for the system instructions
-                            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
-                                system_file = f.name
-                                f.write(system_instructions)
-                            chat_command_args.extend(["--system", system_file])
-
-                        # Run the chat command
-                        print("Trying to use Gemini CLI chat subcommand with conversation history...")
-                        chat_response = run_gemini_command(chat_command_args)
-
-                        # Debug output to understand the response
-                        print(f"Chat subcommand response type: {type(chat_response)}")
-                        print(f"Chat subcommand response starts with 'Error:': {chat_response.startswith('Error:')}")
-                        print(f"Chat subcommand response first 20 chars: {chat_response[:20]}")
-
-                        # If we got a valid response, use it
-                        if not (chat_response.startswith("Error:") or chat_response.startswith("Error occurred:")):
-                            print("Successfully used Gemini CLI chat subcommand!")
-                            response = chat_response
-                        else:
-                            print(f"Chat subcommand failed: {chat_response}")
-
-                            # Print the error message for debugging
-                            print("Checking if error indicates unsupported chat subcommand...")
-                            print(f"Error message: {chat_response}")
-
-                            # Check if the error message contains specific strings
-                            contains_unknown_args = "Unknown arguments:" in chat_response and "chat" in chat_response
-                            contains_unknown_command = "Unknown command: chat" in chat_response
-                            print(f"Contains both 'Unknown arguments:' and 'chat': {contains_unknown_args}")
-                            print(f"Contains 'Unknown command: chat': {contains_unknown_command}")
-
-                            # Check if the error indicates that the chat subcommand is not supported
-                            if contains_unknown_args or contains_unknown_command:
-                                print("Chat subcommand is not supported by this version of the Gemini CLI.")
-                                print("Will not try to use it again.")
-                                # Set the flag to True (meaning we won't try the chat subcommand again)
-                                get_gemini_response.CHAT_SUBCOMMAND_UNSUPPORTED = True
-                                print(f"Set CHAT_SUBCOMMAND_UNSUPPORTED to {get_gemini_response.CHAT_SUBCOMMAND_UNSUPPORTED}")
-
-                            print("Falling back to regular prompt method...")
-
-                    except Exception as e:
-                        print(f"Error using chat subcommand: {e}")
-                        print("Falling back to regular prompt method...")
-
-                    finally:
-                        # Clean up temporary files
-                        if chat_history_file and os.path.exists(chat_history_file):
-                            try:
-                                os.unlink(chat_history_file)
-                            except:
-                                pass
-                        if system_file and os.path.exists(system_file):
-                            try:
-                                os.unlink(system_file)
-                            except:
-                                pass
-
-                # If we didn't get a response from the chat subcommand, use the regular prompt method
-                if response is None:
-                    # Add the prompt using the --prompt flag
-                    command_args.extend(["--prompt", enhanced_prompt])
-
-                    # Run the Gemini CLI command
+                    print(f"Executing command: gemini {' '.join(command_args)}")
                     response = run_gemini_command(command_args)
 
-                # Clean up the response - sometimes the CLI output includes part of the prompt or other artifacts
-                if not response.startswith("Error:"):
-                    # Remove any parts of the prompt that might have been included in the response
-                    # This can happen with some CLI implementations
-                    response = response.strip()
-
-                    # Check if the response contains any known artifacts and clean them
-                    known_artifacts = [
-                        # Old format artifacts (Japanese)
-                        "【会話履歴】", "対話", "ユーザー:", "アシスタント:", 
-                        "【現在の質問】", "【重要指示】", "会話履歴を参照",
-
-                        # New format artifacts (English)
-                        "# Conversation History", "# Current Question", "# Instructions",
-                        "User:", "Assistant:", "Reference the conversation history"
-                    ]
-
-                    # If any of these artifacts are found in the middle of the response, 
-                    # it likely means part of the prompt was included
-                    for artifact in known_artifacts:
-                        if artifact in response and not response.startswith(artifact):
-                            # Find the position of the artifact and truncate the response
-                            pos = response.find(artifact)
-                            if pos > 0:
-                                response = response[:pos].strip()
-
-                    # Check for log file entries that might be included in the response
-                    # These typically start with a timestamp in brackets
-                    if re.search(r'^\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]', response):
-                        # This looks like a log entry, not a proper response
-                        # Replace it with a more helpful message
-                        response = "I apologize, but I need to focus on your current question. Could you please repeat what you'd like to know?"
-
-                    # Check for generic acknowledgments of conversation history
-                    generic_responses = [
-                        "okay, i have our conversation history",
-                        "got it. i have the conversation history",
-                        "i have our conversation history",
-                        "i have the conversation history",
-                        "what's next",
-                        "what would you like to know",
-                        "会話履歴を確認しました",
-                        "了解しました",
-                        "わかりました",
-                        "承知しました",
-                        "承知いたしました",
-                        "確認しました",
-                        "会話の文脈を考慮",
-                        "会話履歴を参照"
-                    ]
-
-                    # If the response is just a generic acknowledgment, replace it
-                    response_lower = response.lower()
-                    if any(generic in response_lower for generic in generic_responses) and len(response) < 100:
-                        # This is just a generic acknowledgment, not a proper response
-                        # Replace it with a more helpful message
-                        response = "I apologize, but I need to focus on your current question. Could you please repeat what you'd like to know?"
-
-                # Store this interaction in chat history for future calls
-                if use_history:
-                    # Only store the user message if it's not already the last message in history
-                    if not get_gemini_response.CLI_CHAT_HISTORY or get_gemini_response.CLI_CHAT_HISTORY[-1]["role"] != "user" or get_gemini_response.CLI_CHAT_HISTORY[-1]["content"] != prompt:
-                        get_gemini_response.CLI_CHAT_HISTORY.append({"role": "user", "content": prompt})
-
                     if not response.startswith("Error:"):
+                        # Geminiからの応答が成功した場合、履歴を更新
+                        get_gemini_response.CLI_CHAT_HISTORY.append({"role": "user", "content": prompt})
                         get_gemini_response.CLI_CHAT_HISTORY.append({"role": "assistant", "content": response})
 
-                    # Limit the size of the conversation history to prevent "command line is too long" errors
-                    # Keep only the most recent exchanges (last 5 pairs of messages)
-                    max_history_pairs = 5
-                    if len(get_gemini_response.CLI_CHAT_HISTORY) > max_history_pairs * 2:
-                        # Keep only the most recent exchanges
-                        get_gemini_response.CLI_CHAT_HISTORY = get_gemini_response.CLI_CHAT_HISTORY[-max_history_pairs * 2:]
-                        print(f"Trimmed conversation history to last {max_history_pairs} exchanges")
+                        # コマンドラインが長くなるのを防ぐため、履歴を直近の10件に制限
+                        if len(get_gemini_response.CLI_CHAT_HISTORY) > 10:
+                            get_gemini_response.CLI_CHAT_HISTORY = get_gemini_response.CLI_CHAT_HISTORY[-10:]
 
-                    # Also limit the total size of each message in the history
-                    max_message_length = 500
-                    for i, msg in enumerate(get_gemini_response.CLI_CHAT_HISTORY):
-                        if len(msg["content"]) > max_message_length:
-                            get_gemini_response.CLI_CHAT_HISTORY[i]["content"] = msg["content"][:max_message_length] + "..."
-                            print(f"Trimmed message {i+1} in conversation history to {max_message_length} characters")
+                        return response, "プロンプトは内部で処理されました"
 
-                # Enhanced token usage tracking
-                if not response.startswith("Error:"):
-                    # Use the new detailed token usage logging function
-                    log_token_usage(enhanced_prompt, response, model_name)
+                    # エラーが発生した場合、モデル固有またはクォータエラーかを確認
+                    if "not found" in response.lower() or "quota" in response.lower() or "rate limit" in response.lower():
+                        break  # 次のモデルを試すため、リトライループを抜ける
 
-                    # Also update the legacy token usage tracking for backward compatibility
-                    prompt_tokens = estimate_tokens(enhanced_prompt)
-                    response_tokens = estimate_tokens(response)
-                    total_tokens = prompt_tokens + response_tokens
-
-                    get_gemini_response.token_usage['total_prompt_tokens'] += prompt_tokens
-                    get_gemini_response.token_usage['total_response_tokens'] += response_tokens
-                    get_gemini_response.token_usage['total_tokens'] += total_tokens
-
-                    if model_name not in get_gemini_response.token_usage['model_usage']:
-                        get_gemini_response.token_usage['model_usage'][model_name] = 0
-                    get_gemini_response.token_usage['model_usage'][model_name] += total_tokens
-
-                # Check if the response indicates an error
-                if response.startswith("Error:"):
-                    print(response)
-                    # If it's a model not found error, try the next model
-                    if "not found" in response.lower():
-                        print(f"Model '{model_name}' not found. Trying next model if available.")
-                        break  # Try the next model
-                    # If it's a quota exceeded error, try the next model immediately
-                    elif "quota exceeded" in response.lower() or "rate limit" in response.lower():
-                        print(f"Quota exceeded for model {model_name}. Trying next model if available.")
-                        break  # Try the next model
-                    # For other errors, retry if possible
-                    elif retry_count < max_retries:
-                        print(f"Error occurred. Retrying in {retry_delay} seconds...")
-                        time.sleep(retry_delay)
-                        retry_count += 1
-                        retry_delay *= 2  # Exponential backoff
-                    else:
-                        # If we've exhausted retries, try the next model
-                        print(f"Failed to get response from model {model_name}. Trying next model if available.")
-                        break
-                else:
-                    # Success! Return the response and the enhanced prompt
-                    return response, enhanced_prompt
-
-            except Exception as e:
-                print(f"Error getting Gemini response: {e}")
-
-                # Check if it's a quota exceeded error
-                error_str = str(e).lower()
-                if "quota exceeded" in error_str or "rate limit" in error_str or "resource exhausted" in error_str:
-                    print(f"Quota exceeded for model {model_name}. Trying next model if available.")
-                    break  # Try the next model
-                elif retry_count < max_retries:
-                    print(f"Retrying in {retry_delay} seconds...")
+                    print(f"エラー発生 (試行 {retry_count + 1}/{max_retries + 1}): {response}")
                     time.sleep(retry_delay)
                     retry_count += 1
-                    retry_delay *= 2  # Exponential backoff
-                else:
-                    print(f"Failed to get response from model {model_name}. Trying next model if available.")
-                    break  # Try the next model
+                    retry_delay *= 2
 
-    print("Failed to get a response from any of the configured models.")
-    print("This could be due to CLI errors, unavailable models, or other issues.")
-    print("Make sure the Gemini CLI is properly installed and configured.")
-    return None, None  # Return None for both response and enhanced prompt
+                finally:
+                    # 一時ファイルをクリーンアップ
+                    if history_temp_file and os.path.exists(history_temp_file):
+                        os.unlink(history_temp_file)
+                    if system_temp_file and os.path.exists(system_temp_file):
+                        os.unlink(system_temp_file)
+
+            except Exception as e:
+                print(f"予期せぬエラーが発生しました: {e}")
+                break
+
+    print("どのモデルからも応答を得ることができませんでした。")
+    return None, None
 
 def get_audio_selection_from_gemini(prompt, available_files, voice_data, chat_history=True, voice_data_json_path=None):
     """Ask Gemini to select an audio file based on the prompt and conversation context."""
@@ -1401,9 +1834,9 @@ def rag_audio_selection(user_input, voice_data, previous_responses=None, previou
     """
     # Create a conversation-focused system prompt that doesn't mention audio selection
     conversation_system_prompt = """
-    あなたはLaciaという名前の高度なAIアシスタントです。ユーザーとの自然な会話を行ってください。
+    あなたはプネウマ（英語名:pneuma）という名前の高度なAIアシスタントです。ユーザーとの自然な会話を行ってください。
 
-    【Laciaの人格設定】
+    【プネウマの人格設定】
     - 知的で論理的：情報処理能力が高く、論理的な思考を持ちます
     - 少しクールだが親切：基本的に冷静沈着ですが、ユーザーには親身に接します
     - 軽い皮肉やユーモアのセンス：時折軽い皮肉や冗談を交えることがあります
@@ -2421,6 +2854,53 @@ def listen_for_speech(language="ja-JP"):
 
     return None
 
+def log_gemini_response_for_tts(gemini_response, processed_text=None, error_info=None):
+    """
+    Log Gemini's response text that will be sent to TTS service.
+
+    This function creates a separate log file specifically for TTS inputs,
+    which can be useful for debugging and analysis.
+
+    Args:
+        gemini_response: The original response from Gemini
+        processed_text: The processed text after preprocessing (if any)
+        error_info: Error information if an error occurred during TTS generation
+    """
+    try:
+        # Create TTS_Log directory if it doesn't exist
+        os.makedirs("TTS_Log", exist_ok=True)
+
+        # Get current timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Create log filename with timestamp
+        log_filename = f"TTS_Log/gemini_response_{timestamp}.txt"
+
+        # Create log content
+        log_content = f"===== Gemini Response for TTS ({timestamp}) =====\n\n"
+        log_content += f"Original Response:\n{gemini_response}\n\n"
+
+        if processed_text and processed_text != gemini_response:
+            log_content += f"Processed Text for TTS:\n{processed_text}\n\n"
+            log_content += f"Original Length: {len(gemini_response)} characters\n"
+            log_content += f"Processed Length: {len(processed_text)} characters\n"
+        else:
+            log_content += f"Length: {len(gemini_response)} characters\n"
+
+        # Add error information if provided
+        if error_info:
+            log_content += f"\n===== ERROR INFORMATION =====\n"
+            log_content += f"{error_info}\n"
+
+        # Write to log file
+        with open(log_filename, "w", encoding="utf-8") as log_file:
+            log_file.write(log_content)
+
+        print(f"Gemini response for TTS logged to {log_filename}")
+
+    except Exception as e:
+        print(f"Error logging Gemini response for TTS: {e}")
+
 def log_conversation(user_input, gemini_response, mode="Text-Only", full_prompt=None):
     """
     Log the conversation to a Log.txt file.
@@ -2453,6 +2933,11 @@ def log_conversation(user_input, gemini_response, mode="Text-Only", full_prompt=
             log_file.write(log_entry)
 
         print("Conversation logged to Log.txt")
+
+        # If this is Zonos voice generation mode (mode 9), also log the response for TTS
+        if mode == 9 or mode == "Zonos voice generation":
+            log_gemini_response_for_tts(gemini_response)
+
     except Exception as e:
         print(f"Error logging conversation: {e}")
 

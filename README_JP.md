@@ -33,17 +33,25 @@ Gemini とのすべての会話は自動的に `Log.txt` ファイルに記録�
 1. システムに Gemini CLI をインストールします
    - [公式 Gemini CLI インストール手順](https://cloud.google.com/gemini/docs/codeassist/gemini-cli)に従ってください
    - このスクリプトを実行する前に CLI で認証を済ませてください
-2. .env ファイルで Gemini CLI へのパスを設定します：
-   - .env ファイルに `GEMINI_CLI_PATH=<path_to_gemini_cli>` を追加します
-   - 例：`GEMINI_CLI_PATH=C:/Users/username/AppData/Roaming/npm/gemini.cmd`
+2. プロジェクトのルートディレクトリに `.env` ファイルを作成し、以下の内容を追加します：
+   ```
+   GEMINI_API_KEY=your_gemini_api_key_here
+   PORT=5000
+   GEMINI_CLI_PATH=path_to_your_gemini_cli
+   SYSTEM_PROMPT_PATH=system_prompt.txt
+   ZONOS_API=your_zonos_api_key_here
+   ```
+   - `your_gemini_api_key_here` を実際の Gemini API キーに置き換えてください
+   - `path_to_your_gemini_cli` を Gemini CLI へのパスに置き換えてください（例：`C:/Users/username/AppData/Roaming/npm/gemini.cmd`）
+   - モード9を使用する予定がある場合は、`your_zonos_api_key_here` を実際の Zonos API キーに置き換えてください
 3. （オプション）カスタムシステムプロンプトを設定します：
-   - システムプロンプトの指示を含むテキストファイルを作成します
-   - .env ファイルに `SYSTEM_PROMPT_PATH=<path_to_system_prompt_file>` を追加します
-   - 例：`SYSTEM_PROMPT_PATH=system_prompt.txt`
+   - `system_prompt.txt` ファイルを編集してカスタムシステムプロンプトの指示を追加します
 4. 必要な Python パッケージをインストールします：
    ```
-   pip install pygame SpeechRecognition pyaudio python-dotenv
+   pip install pygame SpeechRecognition pyaudio python-dotenv flask
    ```
+5. `.env` ファイルを安全に保ち、バージョン管理にコミットしないようにしてください
+   - プロジェクトの `.gitignore` ファイルは既に機密ファイルを除外するように設定されています
 
 ## 使用方法
 
@@ -164,8 +172,28 @@ Gemini とのすべてのやり取りは、スクリプトと同じディレク�
 - `voiceData.csv`：音声ファイル名とそのテキスト内容をマッピングする CSV ファイル
 - `Voice/`：WAV 音声ファイルを含むディレクトリ
 - `Log.txt`：自動生成される会話ログを含むファイル
-- `system_prompt.txt`：カスタムシステムプロンプト指示を含むオプションファイル
-- `.env`：Gemini CLI パスなどの環境変数用の設定ファイル
+- `TTS_Log/`：テキスト読み上げログファイルを含むディレクトリ
+- `system_prompt.txt`：カスタムシステムプロンプト指示を含むファイル
+- `.env`：API キーやパスなどの環境変数用の設定ファイル
+- `.gitignore`：バージョン管理から除外するファイルを指定する設定ファイル
+- `web_interface.py`：アプリケーションのウェブインターフェーススクリプト
+- `templates/`：ウェブインターフェース用の HTML テンプレートを含むディレクトリ
+- `static/`：ウェブインターフェース用の静的ファイル（CSS、JavaScript）を含むディレクトリ
+- `system_prompt_templates/`：異なるモード用のテンプレートシステムプロンプトを含むディレクトリ
+
+## セキュリティ
+
+このプロジェクトでは、安全に保管すべき API キーやその他の機密情報を使用しています：
+
+- **API キー**：API キーをバージョン管理にコミットしないでください。`.gitignore` ファイルで除外されている `.env` ファイルに保存してください。
+- **ログファイル**：会話ログには機密情報が含まれている可能性があります。`Log.txt` ファイルと `TTS_Log/` ディレクトリは `.gitignore` ファイルで除外されています。
+- **環境変数**：`.env` ファイルには機密情報が含まれており、共有したりバージョン管理にコミットしたりしないでください。
+- **音声データ**：`Voice/` ディレクトリには個人の音声録音が含まれている可能性があり、`.gitignore` ファイルで除外されています。
+
+このリポジトリをフォークまたはクローンする場合は、以下を確認してください：
+1. 自分の API キーを含む独自の `.env` ファイルを作成する
+2. 機密ファイルが `.gitignore` ファイルで適切に除外されていることを確認する
+3. 機密情報が誤ってコミットされていないか定期的にリポジトリを確認する
 
 ## トラブルシューティング
 

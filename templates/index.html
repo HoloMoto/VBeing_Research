@@ -52,14 +52,18 @@
             gap: 15px;
         }
 
-        .mode-selector {
+        .mode-selector, .model-selector {
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
             margin-bottom: 10px;
         }
 
-        .mode-btn {
+        .model-selector {
+            margin-top: 10px;
+        }
+
+        .mode-btn, .model-btn {
             padding: 8px 15px;
             background-color: #f1f1f1;
             border: 1px solid #ddd;
@@ -68,10 +72,17 @@
             transition: all 0.2s;
         }
 
-        .mode-btn.active {
+        .mode-btn.active, .model-btn.active {
             background-color: #4285f4;
             color: white;
             border-color: #4285f4;
+        }
+
+        .model-selector-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+            display: block;
         }
 
         .input-container {
@@ -171,6 +182,27 @@
                     <!-- Mode buttons will be added here dynamically -->
                 </div>
 
+                <div class="model-selector-container">
+                    <span class="model-selector-label">Select Gemini model:</span>
+                    <div class="model-selector" id="model-selector">
+                        <!-- Model buttons will be added here dynamically -->
+                    </div>
+                </div>
+
+                <!-- Clone voice selector (hidden by default) -->
+                <div class="clone-voice-container" id="clone-voice-container" style="display: none; margin-top: 15px;">
+                    <span class="model-selector-label">Select clone voice:</span>
+                    <div class="clone-voice-controls">
+                        <select id="clone-voice-select" style="padding: 8px; border-radius: 4px; border: 1px solid #ddd; width: 100%; margin-bottom: 10px;">
+                            <option value="">No clone voice (use default)</option>
+                            <!-- Clone voice options will be added here dynamically -->
+                        </select>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 10px;">
+                            Place your voice samples in the Voice/CloneVoice directory to use them as clone voices.
+                        </div>
+                    </div>
+                </div>
+
                 <div class="input-container">
                     <input type="text" id="user-input" placeholder="Type your message..." disabled>
                     <button class="action-btn" id="send-btn" disabled>Send</button>
@@ -183,6 +215,62 @@
                 </div>
 
                 <div class="status" id="status">Initializing system...</div>
+
+                <!-- Direct TTS Debug Tool -->
+                <div class="direct-tts-container" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">デバッグ用 Zonos TTS ツール</h3>
+                    <div style="margin-bottom: 10px; font-size: 12px; color: #666;">
+                        Geminiを経由せずに直接Zonos APIでテキストから音声を生成します。
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <textarea id="direct-tts-input" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ddd; min-height: 80px;" placeholder="音声に変換するテキストを入力してください..."></textarea>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 14px;">クローンボイスを選択 (オプション):</label>
+                        <select id="direct-tts-voice-select" style="padding: 8px; border-radius: 4px; border: 1px solid #ddd; width: 100%;">
+                            <option value="">クローンボイスなし (デフォルト)</option>
+                            <!-- Clone voice options will be added here dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <button id="direct-tts-btn" class="action-btn" style="width: 100%;">音声生成</button>
+                    </div>
+                    <div id="direct-tts-status" style="margin-top: 10px; font-size: 14px; color: #666;"></div>
+                </div>
+
+                <!-- System Prompt Editor -->
+                <div class="system-prompt-container" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">システムプロンプト設定</h3>
+                    <div style="margin-bottom: 10px; font-size: 12px; color: #666;">
+                        Geminiに対するシステムプロンプトを編集・保存できます。テンプレートとして保存して再利用することも可能です。
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <textarea id="system-prompt-input" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ddd; min-height: 150px;" placeholder="システムプロンプトを入力してください..."></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <button id="load-system-prompt-btn" class="action-btn" style="flex: 1;">現在のプロンプトを読み込む</button>
+                        <button id="save-system-prompt-btn" class="action-btn" style="flex: 1;">現在のプロンプトを保存</button>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 14px;">テンプレート:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <select id="system-prompt-template-select" style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #ddd;">
+                                <option value="">テンプレートを選択</option>
+                                <!-- Template options will be added here dynamically -->
+                            </select>
+                            <button id="load-template-btn" class="action-btn">読み込み</button>
+                            <button id="save-template-btn" class="action-btn">新規保存</button>
+                            <button id="delete-template-btn" class="action-btn" style="background-color: #f44336;">削除</button>
+                        </div>
+                    </div>
+                    <div id="system-prompt-status" style="margin-top: 10px; font-size: 14px; color: #666;"></div>
+                </div>
+
+                <!-- Quota Usage Display -->
+                <div class="quota-usage" id="quota-usage" style="margin-top: 15px; display: none;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">Gemini API Quota Usage</h3>
+                    <div id="quota-container"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -202,6 +290,7 @@
 
             // State variables
             let currentMode = null;
+            let currentModel = null;
             let isRecording = false;
             let recognition = null;
 
@@ -228,6 +317,16 @@
 
             micBtn.addEventListener('click', toggleSpeechRecognition);
 
+            // Fetch quota usage periodically
+            fetchQuotaUsage();
+            setInterval(fetchQuotaUsage, 60000); // Update every minute
+
+            // Initialize direct TTS tool
+            initializeDirectTTS();
+
+            // Initialize system prompt editor
+            initializeSystemPromptEditor();
+
             // Functions
             async function initializeApp() {
                 try {
@@ -253,6 +352,34 @@
                             modeSelector.appendChild(btn);
                         });
 
+                        // Create model buttons if available
+                        const modelSelector = document.getElementById('model-selector');
+                        if (data.available_models && data.available_models.length > 0) {
+                            // Add an "Auto" option first
+                            const autoBtn = document.createElement('button');
+                            autoBtn.className = 'model-btn active'; // Auto is selected by default
+                            autoBtn.textContent = 'Auto (recommended)';
+                            autoBtn.dataset.modelId = 'auto';
+                            autoBtn.addEventListener('click', () => setModel('auto'));
+                            modelSelector.appendChild(autoBtn);
+
+                            // Add buttons for each available model
+                            data.available_models.forEach(model => {
+                                const btn = document.createElement('button');
+                                btn.className = 'model-btn';
+                                btn.textContent = model.name;
+                                btn.dataset.modelId = model.id;
+                                btn.addEventListener('click', () => setModel(model.id));
+                                modelSelector.appendChild(btn);
+                            });
+                        } else {
+                            // If no models are available, show a message
+                            const noModelsMsg = document.createElement('span');
+                            noModelsMsg.textContent = 'No models available';
+                            noModelsMsg.style.color = '#666';
+                            modelSelector.appendChild(noModelsMsg);
+                        }
+
                         // Add a welcome message
                         addMessage('Welcome to Gemini Voice Interface! Please select a mode to begin.', 'gemini');
                     } else {
@@ -261,6 +388,43 @@
                 } catch (error) {
                     statusEl.textContent = `Error initializing: ${error.message}`;
                     console.error('Initialization error:', error);
+                }
+            }
+
+            // Function to load available clone voices
+            async function loadCloneVoices() {
+                try {
+                    const response = await fetch('/api/clone_voices');
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        const select = document.getElementById('clone-voice-select');
+
+                        // Clear existing options except the first one
+                        while (select.options.length > 1) {
+                            select.remove(1);
+                        }
+
+                        // Add options for each voice
+                        data.voices.forEach(voice => {
+                            const option = document.createElement('option');
+                            option.value = voice.id;
+                            option.textContent = voice.name;
+                            select.appendChild(option);
+                        });
+
+                        // Show a message if no voices are available
+                        if (data.voices.length === 0) {
+                            const option = document.createElement('option');
+                            option.disabled = true;
+                            option.textContent = 'No clone voices available';
+                            select.appendChild(option);
+                        }
+                    } else {
+                        console.error('Error loading clone voices:', data.message);
+                    }
+                } catch (error) {
+                    console.error('Error loading clone voices:', error);
                 }
             }
 
@@ -276,7 +440,7 @@
 
                     const data = await response.json();
 
-                    if (data.status === 'success') {
+                    if (data.status === 'success' || data.status === 'warning') {
                         currentMode = parseInt(modeId);
 
                         // Update UI
@@ -291,6 +455,16 @@
                         userInput.disabled = false;
                         sendBtn.disabled = false;
                         micBtn.disabled = false;
+
+                        // Show/hide clone voice selector based on mode
+                        const cloneVoiceContainer = document.getElementById('clone-voice-container');
+                        if (currentMode === 9) {
+                            cloneVoiceContainer.style.display = 'block';
+                            // Load available clone voices
+                            loadCloneVoices();
+                        } else {
+                            cloneVoiceContainer.style.display = 'none';
+                        }
 
                         // Show mode-specific message
                         let modeMessage = `Mode ${modeId} activated: `;
@@ -313,16 +487,76 @@
                             case 8:
                                 modeMessage += 'Speech RAG mode. Click the microphone to speak.';
                                 break;
+                            case 9:
+                                modeMessage += 'Zonos voice generation mode. New audio will be generated for each response.';
+                                break;
                         }
 
                         addMessage(modeMessage, 'gemini');
-                        statusEl.textContent = data.message;
+
+                        // Display warning if present
+                        if (data.status === 'warning') {
+                            statusEl.textContent = `Warning: ${data.message}`;
+                            addMessage(`Warning: ${data.message}`, 'gemini');
+                        } else {
+                            statusEl.textContent = data.message;
+                        }
                     } else {
                         statusEl.textContent = `Error: ${data.message}`;
                     }
                 } catch (error) {
                     statusEl.textContent = `Error setting mode: ${error.message}`;
                     console.error('Mode setting error:', error);
+                }
+            }
+
+            async function setModel(modelId) {
+                try {
+                    // If modelId is 'auto', set currentModel to null (use automatic selection)
+                    if (modelId === 'auto') {
+                        currentModel = null;
+
+                        // Update UI
+                        document.querySelectorAll('.model-btn').forEach(btn => {
+                            btn.classList.remove('active');
+                            if (btn.dataset.modelId === 'auto') {
+                                btn.classList.add('active');
+                            }
+                        });
+
+                        statusEl.textContent = 'Using automatic model selection';
+                        return;
+                    }
+
+                    // Otherwise, send a request to set the model
+                    const response = await fetch('/api/set_model', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ model: modelId })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        currentModel = modelId;
+
+                        // Update UI
+                        document.querySelectorAll('.model-btn').forEach(btn => {
+                            btn.classList.remove('active');
+                            if (btn.dataset.modelId === modelId) {
+                                btn.classList.add('active');
+                            }
+                        });
+
+                        statusEl.textContent = data.message;
+                    } else {
+                        statusEl.textContent = `Error: ${data.message}`;
+                    }
+                } catch (error) {
+                    statusEl.textContent = `Error setting model: ${error.message}`;
+                    console.error('Model setting error:', error);
                 }
             }
 
@@ -344,12 +578,26 @@
                 statusEl.textContent = 'Processing...';
 
                 try {
+                    // Prepare request data
+                    const requestData = { message };
+
+                    // Add clone voice information if in Zonos mode
+                    if (currentMode === 9) {
+                        const cloneVoiceSelect = document.getElementById('clone-voice-select');
+                        const selectedVoice = cloneVoiceSelect.value;
+
+                        if (selectedVoice) {
+                            requestData.use_clone_voice = true;
+                            requestData.clone_voice_file = selectedVoice;
+                        }
+                    }
+
                     const response = await fetch('/api/send_message', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ message })
+                        body: JSON.stringify(requestData)
                     });
 
                     const data = await response.json();
@@ -358,30 +606,69 @@
                         // Add Gemini's response to chat
                         addMessage(data.response, 'gemini');
 
-                        // If there's an audio file, play it
+                        // Show which model was used
+                        if (data.model_used) {
+                            const modelInfo = document.createElement('div');
+                            modelInfo.className = 'model-info';
+                            modelInfo.textContent = `Model used: ${data.model_used}`;
+                            modelInfo.style.fontSize = '12px';
+                            modelInfo.style.color = '#666';
+                            modelInfo.style.marginTop = '5px';
+                            modelInfo.style.textAlign = 'right';
+
+                            // Add the model info to the last message
+                            const lastMessage = chatContainer.lastElementChild;
+                            if (lastMessage) {
+                                lastMessage.appendChild(modelInfo);
+                            }
+                        }
+
+                        // Check if there's an audio file
                         if (data.audio_file) {
-                            statusEl.textContent = `Playing audio: ${data.audio_file}`;
+                            // Check if audio is being generated asynchronously
+                            if (data.audio_file === 'generating') {
+                                // Show a message indicating that audio is being generated
+                                statusEl.textContent = '音声を生成中...完了すると自動的に再生されます';
 
-                            // Create audio element
-                            const audio = new Audio(`/audio/${data.audio_file}`);
+                                // Add a note to the message about async generation
+                                const asyncNote = document.createElement('div');
+                                asyncNote.className = 'async-note';
+                                asyncNote.textContent = '(音声生成中...)';
+                                asyncNote.style.fontSize = '12px';
+                                asyncNote.style.color = '#666';
+                                asyncNote.style.marginTop = '5px';
+                                asyncNote.style.fontStyle = 'italic';
 
-                            // Add event listeners for future character animation
-                            audio.addEventListener('play', function() {
-                                // Hook for future 3D character speaking animation
-                                if (window.GeminiCharacter && window.character) {
-                                    window.character.speak(audio.duration * 1000);
+                                // Add the note to the last message
+                                const lastMessage = chatContainer.lastElementChild;
+                                if (lastMessage) {
+                                    lastMessage.appendChild(asyncNote);
                                 }
-                            });
+                            } else {
+                                // Regular audio file, play it
+                                statusEl.textContent = `Playing audio: ${data.audio_file}`;
 
-                            audio.addEventListener('ended', function() {
-                                // Hook for future 3D character idle animation
-                                if (window.GeminiCharacter && window.character) {
-                                    window.character.idle();
-                                }
-                                statusEl.textContent = 'Ready';
-                            });
+                                // Create audio element
+                                const audio = new Audio(`/audio/${data.audio_file}`);
 
-                            audio.play();
+                                // Add event listeners for future character animation
+                                audio.addEventListener('play', function() {
+                                    // Hook for future 3D character speaking animation
+                                    if (window.GeminiCharacter && window.character) {
+                                        window.character.speak(audio.duration * 1000);
+                                    }
+                                });
+
+                                audio.addEventListener('ended', function() {
+                                    // Hook for future 3D character idle animation
+                                    if (window.GeminiCharacter && window.character) {
+                                        window.character.idle();
+                                    }
+                                    statusEl.textContent = 'Ready';
+                                });
+
+                                audio.play();
+                            }
                         } else {
                             statusEl.textContent = 'Ready';
                         }
@@ -432,35 +719,110 @@
                 recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
                 recognition.lang = 'ja-JP';  // Set language to Japanese
                 recognition.continuous = false;
-                recognition.interimResults = false;
+                recognition.interimResults = true;  // Changed to true to get feedback during speech
+
+                // Increase timeout by not ending automatically
+                recognition.maxAlternatives = 1;
+
+                // Add visual feedback
+                statusEl.textContent = 'マイクをテスト中...';
+                micBtn.classList.add('recording');
+
+                // Add a timeout to provide better user feedback
+                let speechTimeout = null;
 
                 recognition.onstart = function() {
                     isRecording = true;
                     micBtn.classList.add('recording');
-                    statusEl.textContent = 'Listening...';
+                    statusEl.textContent = '聞いています...大きな声ではっきりと話してください';
+
+                    // Set a longer timeout (15 seconds)
+                    speechTimeout = setTimeout(function() {
+                        if (isRecording) {
+                            statusEl.textContent = '音声が検出されませんでした。もう一度試してください。';
+                            stopSpeechRecognition();
+                        }
+                    }, 15000);
+                };
+
+                recognition.onaudiostart = function() {
+                    statusEl.textContent = 'オーディオ入力を検出しました。話してください...';
+                };
+
+                recognition.onspeechstart = function() {
+                    statusEl.textContent = '音声を検出しました。聞いています...';
                 };
 
                 recognition.onresult = function(event) {
-                    const transcript = event.results[0][0].transcript;
-                    userInput.value = transcript;
-                    stopSpeechRecognition();
+                    // Clear the timeout since we got a result
+                    if (speechTimeout) {
+                        clearTimeout(speechTimeout);
+                        speechTimeout = null;
+                    }
 
-                    // Send the message after a short delay
-                    setTimeout(sendMessage, 500);
+                    // Get the final transcript
+                    let finalTranscript = '';
+                    let interimTranscript = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        if (event.results[i].isFinal) {
+                            finalTranscript += event.results[i][0].transcript;
+                        } else {
+                            interimTranscript += event.results[i][0].transcript;
+                            statusEl.textContent = `聞き取り中: ${interimTranscript}`;
+                        }
+                    }
+
+                    if (finalTranscript) {
+                        userInput.value = finalTranscript;
+                        stopSpeechRecognition();
+
+                        // Send the message after a short delay
+                        setTimeout(sendMessage, 500);
+                    }
                 };
 
                 recognition.onerror = function(event) {
                     console.error('Speech recognition error', event.error);
-                    statusEl.textContent = `Speech recognition error: ${event.error}`;
+
+                    // Clear the timeout if it exists
+                    if (speechTimeout) {
+                        clearTimeout(speechTimeout);
+                        speechTimeout = null;
+                    }
+
+                    // Provide more helpful error messages
+                    if (event.error === 'no-speech') {
+                        statusEl.textContent = '音声が検出されませんでした。マイクに近づいて、はっきりと話してください。';
+                    } else if (event.error === 'audio-capture') {
+                        statusEl.textContent = 'マイクが検出されないか、正しく機能していません。';
+                    } else if (event.error === 'not-allowed') {
+                        statusEl.textContent = 'マイクへのアクセスが許可されていません。ブラウザの設定を確認してください。';
+                    } else {
+                        statusEl.textContent = `音声認識エラー: ${event.error}`;
+                    }
+
                     stopSpeechRecognition();
                 };
 
                 recognition.onend = function() {
+                    // Clear the timeout if it exists
+                    if (speechTimeout) {
+                        clearTimeout(speechTimeout);
+                        speechTimeout = null;
+                    }
+
                     stopSpeechRecognition();
                 };
 
                 // Start recognition
-                recognition.start();
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.error('Speech recognition start error:', e);
+                    statusEl.textContent = '音声認識の開始に失敗しました。ページを再読み込みしてください。';
+                    stopSpeechRecognition();
+                }
             }
 
             function stopSpeechRecognition() {
@@ -472,6 +834,448 @@
                 isRecording = false;
                 micBtn.classList.remove('recording');
                 statusEl.textContent = 'Ready';
+            }
+
+            async function fetchQuotaUsage() {
+                try {
+                    const response = await fetch('/api/quota_usage');
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        updateQuotaDisplay(data.quota_stats);
+                    } else {
+                        console.error('Error fetching quota usage:', data.message);
+                    }
+                } catch (error) {
+                    console.error('Error fetching quota usage:', error);
+                }
+            }
+
+            // Initialize direct TTS tool
+            function initializeDirectTTS() {
+                const directTTSBtn = document.getElementById('direct-tts-btn');
+                const directTTSInput = document.getElementById('direct-tts-input');
+                const directTTSVoiceSelect = document.getElementById('direct-tts-voice-select');
+                const directTTSStatus = document.getElementById('direct-tts-status');
+
+                // Load clone voices for direct TTS
+                loadCloneVoicesForDirectTTS();
+
+                // Add event listener for direct TTS button
+                directTTSBtn.addEventListener('click', async function() {
+                    const text = directTTSInput.value.trim();
+                    if (!text) {
+                        directTTSStatus.textContent = 'エラー: テキストを入力してください';
+                        directTTSStatus.style.color = '#ea4335';
+                        return;
+                    }
+
+                    // Disable button and show loading status
+                    directTTSBtn.disabled = true;
+                    directTTSStatus.textContent = '音声生成中...';
+                    directTTSStatus.style.color = '#666';
+
+                    try {
+                        // Prepare request data
+                        const requestData = { text };
+
+                        // Add clone voice information if selected
+                        const selectedVoice = directTTSVoiceSelect.value;
+                        if (selectedVoice) {
+                            requestData.use_clone_voice = true;
+                            requestData.clone_voice_file = selectedVoice;
+                        }
+
+                        // Send request to API
+                        const response = await fetch('/api/direct_tts', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(requestData)
+                        });
+
+                        const data = await response.json();
+
+                        if (data.status === 'success') {
+                            directTTSStatus.textContent = `成功: 音声ファイル ${data.audio_file} が生成されました`;
+                            directTTSStatus.style.color = '#34a853';
+
+                            // Add message to chat for reference
+                            addMessage(`デバッグツールで音声生成: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`, 'gemini');
+
+                            // If there's an audio file, create an audio element
+                            if (data.audio_file) {
+                                const audioElement = document.createElement('audio');
+                                audioElement.src = `/audio/${data.audio_file}`;
+                                audioElement.controls = true;
+                                audioElement.style.width = '100%';
+                                audioElement.style.marginTop = '10px';
+
+                                // Remove any existing audio element
+                                const existingAudio = directTTSStatus.querySelector('audio');
+                                if (existingAudio) {
+                                    existingAudio.remove();
+                                }
+
+                                // Add audio element after status text
+                                directTTSStatus.appendChild(audioElement);
+                            }
+                        } else {
+                            directTTSStatus.textContent = `エラー: ${data.message}`;
+                            directTTSStatus.style.color = '#ea4335';
+                        }
+                    } catch (error) {
+                        directTTSStatus.textContent = `エラー: ${error.message}`;
+                        directTTSStatus.style.color = '#ea4335';
+                        console.error('Direct TTS error:', error);
+                    } finally {
+                        // Re-enable button
+                        directTTSBtn.disabled = false;
+                    }
+                });
+            }
+
+            // Initialize system prompt editor
+            function initializeSystemPromptEditor() {
+                const systemPromptInput = document.getElementById('system-prompt-input');
+                const loadSystemPromptBtn = document.getElementById('load-system-prompt-btn');
+                const saveSystemPromptBtn = document.getElementById('save-system-prompt-btn');
+                const systemPromptTemplateSelect = document.getElementById('system-prompt-template-select');
+                const loadTemplateBtn = document.getElementById('load-template-btn');
+                const saveTemplateBtn = document.getElementById('save-template-btn');
+                const deleteTemplateBtn = document.getElementById('delete-template-btn');
+                const systemPromptStatus = document.getElementById('system-prompt-status');
+
+                // Load available templates
+                loadSystemPromptTemplates();
+
+                // Load current system prompt
+                loadCurrentSystemPrompt();
+
+                // Add event listeners for buttons
+                loadSystemPromptBtn.addEventListener('click', loadCurrentSystemPrompt);
+                saveSystemPromptBtn.addEventListener('click', saveCurrentSystemPrompt);
+                loadTemplateBtn.addEventListener('click', loadSelectedTemplate);
+                saveTemplateBtn.addEventListener('click', saveNewTemplate);
+                deleteTemplateBtn.addEventListener('click', deleteSelectedTemplate);
+
+                // Function to load current system prompt
+                async function loadCurrentSystemPrompt() {
+                    try {
+                        systemPromptStatus.textContent = '現在のシステムプロンプトを読み込み中...';
+                        systemPromptStatus.style.color = '#666';
+
+                        const response = await fetch('/api/system_prompt/current');
+                        const data = await response.json();
+
+                        if (data.status === 'success') {
+                            systemPromptInput.value = data.content;
+                            systemPromptStatus.textContent = '現在のシステムプロンプトを読み込みました';
+                            systemPromptStatus.style.color = '#34a853';
+                        } else {
+                            systemPromptStatus.textContent = `エラー: ${data.message}`;
+                            systemPromptStatus.style.color = '#ea4335';
+                        }
+                    } catch (error) {
+                        systemPromptStatus.textContent = `エラー: ${error.message}`;
+                        systemPromptStatus.style.color = '#ea4335';
+                        console.error('Load system prompt error:', error);
+                    }
+                }
+
+                // Function to save current system prompt
+                async function saveCurrentSystemPrompt() {
+                    try {
+                        const content = systemPromptInput.value.trim();
+                        if (!content) {
+                            systemPromptStatus.textContent = 'エラー: システムプロンプトを入力してください';
+                            systemPromptStatus.style.color = '#ea4335';
+                            return;
+                        }
+
+                        systemPromptStatus.textContent = 'システムプロンプトを保存中...';
+                        systemPromptStatus.style.color = '#666';
+
+                        const response = await fetch('/api/system_prompt/current', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ content })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.status === 'success') {
+                            systemPromptStatus.textContent = 'システムプロンプトを保存しました';
+                            systemPromptStatus.style.color = '#34a853';
+                        } else {
+                            systemPromptStatus.textContent = `エラー: ${data.message}`;
+                            systemPromptStatus.style.color = '#ea4335';
+                        }
+                    } catch (error) {
+                        systemPromptStatus.textContent = `エラー: ${error.message}`;
+                        systemPromptStatus.style.color = '#ea4335';
+                        console.error('Save system prompt error:', error);
+                    }
+                }
+
+                // Function to load system prompt templates
+                async function loadSystemPromptTemplates() {
+                    try {
+                        const response = await fetch('/api/system_prompt/templates');
+                        const data = await response.json();
+
+                        if (data.status === 'success') {
+                            // Clear existing options except the first one
+                            while (systemPromptTemplateSelect.options.length > 1) {
+                                systemPromptTemplateSelect.remove(1);
+                            }
+
+                            // Add template options
+                            data.templates.forEach(template => {
+                                const option = document.createElement('option');
+                                option.value = template.filename;
+                                option.textContent = template.name;
+                                systemPromptTemplateSelect.appendChild(option);
+                            });
+                        } else {
+                            console.error('Error loading templates:', data.message);
+                        }
+                    } catch (error) {
+                        console.error('Load templates error:', error);
+                    }
+                }
+
+                // Function to load selected template
+                async function loadSelectedTemplate() {
+                    try {
+                        const templateFilename = systemPromptTemplateSelect.value;
+                        if (!templateFilename) {
+                            systemPromptStatus.textContent = 'エラー: テンプレートを選択してください';
+                            systemPromptStatus.style.color = '#ea4335';
+                            return;
+                        }
+
+                        systemPromptStatus.textContent = 'テンプレートを読み込み中...';
+                        systemPromptStatus.style.color = '#666';
+
+                        const response = await fetch(`/api/system_prompt/templates/${templateFilename}`);
+                        const data = await response.json();
+
+                        if (data.status === 'success') {
+                            systemPromptInput.value = data.content;
+                            systemPromptStatus.textContent = `テンプレート "${data.name}" を読み込みました`;
+                            systemPromptStatus.style.color = '#34a853';
+                        } else {
+                            systemPromptStatus.textContent = `エラー: ${data.message}`;
+                            systemPromptStatus.style.color = '#ea4335';
+                        }
+                    } catch (error) {
+                        systemPromptStatus.textContent = `エラー: ${error.message}`;
+                        systemPromptStatus.style.color = '#ea4335';
+                        console.error('Load template error:', error);
+                    }
+                }
+
+                // Function to save new template
+                async function saveNewTemplate() {
+                    try {
+                        const content = systemPromptInput.value.trim();
+                        if (!content) {
+                            systemPromptStatus.textContent = 'エラー: システムプロンプトを入力してください';
+                            systemPromptStatus.style.color = '#ea4335';
+                            return;
+                        }
+
+                        // Prompt for template name
+                        const templateName = prompt('テンプレート名を入力してください:');
+                        if (!templateName) {
+                            return; // User cancelled
+                        }
+
+                        systemPromptStatus.textContent = 'テンプレートを保存中...';
+                        systemPromptStatus.style.color = '#666';
+
+                        const response = await fetch('/api/system_prompt/templates', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ name: templateName, content })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.status === 'success') {
+                            systemPromptStatus.textContent = `テンプレート "${templateName}" を保存しました`;
+                            systemPromptStatus.style.color = '#34a853';
+
+                            // Reload templates
+                            loadSystemPromptTemplates();
+                        } else {
+                            systemPromptStatus.textContent = `エラー: ${data.message}`;
+                            systemPromptStatus.style.color = '#ea4335';
+                        }
+                    } catch (error) {
+                        systemPromptStatus.textContent = `エラー: ${error.message}`;
+                        systemPromptStatus.style.color = '#ea4335';
+                        console.error('Save template error:', error);
+                    }
+                }
+
+                // Function to delete selected template
+                async function deleteSelectedTemplate() {
+                    try {
+                        const templateFilename = systemPromptTemplateSelect.value;
+                        if (!templateFilename) {
+                            systemPromptStatus.textContent = 'エラー: テンプレートを選択してください';
+                            systemPromptStatus.style.color = '#ea4335';
+                            return;
+                        }
+
+                        // Confirm deletion
+                        const templateName = systemPromptTemplateSelect.options[systemPromptTemplateSelect.selectedIndex].text;
+                        if (!confirm(`テンプレート "${templateName}" を削除してもよろしいですか？`)) {
+                            return; // User cancelled
+                        }
+
+                        systemPromptStatus.textContent = 'テンプレートを削除中...';
+                        systemPromptStatus.style.color = '#666';
+
+                        const response = await fetch(`/api/system_prompt/templates/${templateFilename}`, {
+                            method: 'DELETE'
+                        });
+
+                        const data = await response.json();
+
+                        if (data.status === 'success') {
+                            systemPromptStatus.textContent = `テンプレート "${templateName}" を削除しました`;
+                            systemPromptStatus.style.color = '#34a853';
+
+                            // Reload templates
+                            loadSystemPromptTemplates();
+                        } else {
+                            systemPromptStatus.textContent = `エラー: ${data.message}`;
+                            systemPromptStatus.style.color = '#ea4335';
+                        }
+                    } catch (error) {
+                        systemPromptStatus.textContent = `エラー: ${error.message}`;
+                        systemPromptStatus.style.color = '#ea4335';
+                        console.error('Delete template error:', error);
+                    }
+                }
+            }
+
+            // Load clone voices for direct TTS
+            async function loadCloneVoicesForDirectTTS() {
+                try {
+                    const response = await fetch('/api/clone_voices');
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        const select = document.getElementById('direct-tts-voice-select');
+
+                        // Clear existing options except the first one
+                        while (select.options.length > 1) {
+                            select.remove(1);
+                        }
+
+                        // Add options for each voice
+                        data.voices.forEach(voice => {
+                            const option = document.createElement('option');
+                            option.value = voice.id;
+                            option.textContent = voice.name;
+                            select.appendChild(option);
+                        });
+
+                        // Show a message if no voices are available
+                        if (data.voices.length === 0) {
+                            const option = document.createElement('option');
+                            option.disabled = true;
+                            option.textContent = 'クローンボイスがありません';
+                            select.appendChild(option);
+                        }
+                    } else {
+                        console.error('Error loading clone voices for direct TTS:', data.message);
+                    }
+                } catch (error) {
+                    console.error('Error loading clone voices for direct TTS:', error);
+                }
+            }
+
+            function updateQuotaDisplay(quotaStats) {
+                const quotaContainer = document.getElementById('quota-container');
+                const quotaUsageElement = document.getElementById('quota-usage');
+
+                // Show the quota usage section
+                quotaUsageElement.style.display = 'block';
+
+                // Clear previous content
+                quotaContainer.innerHTML = '';
+
+                // Check if there are any models with usage data
+                if (!quotaStats.models || quotaStats.models.length === 0) {
+                    quotaContainer.innerHTML = '<p>No quota usage data available yet.</p>';
+                    return;
+                }
+
+                // Create a table for quota information
+                const table = document.createElement('table');
+                table.style.width = '100%';
+                table.style.borderCollapse = 'collapse';
+                table.style.marginTop = '10px';
+                table.style.fontSize = '14px';
+
+                // Create table header
+                const thead = document.createElement('thead');
+                thead.innerHTML = `
+                    <tr>
+                        <th style="text-align: left; padding: 5px; border-bottom: 1px solid #ddd;">Model</th>
+                        <th style="text-align: right; padding: 5px; border-bottom: 1px solid #ddd;">Usage</th>
+                        <th style="text-align: right; padding: 5px; border-bottom: 1px solid #ddd;">Limit</th>
+                        <th style="text-align: right; padding: 5px; border-bottom: 1px solid #ddd;">Used %</th>
+                        <th style="text-align: left; padding: 5px; border-bottom: 1px solid #ddd;">Progress</th>
+                    </tr>
+                `;
+                table.appendChild(thead);
+
+                // Create table body
+                const tbody = document.createElement('tbody');
+
+                // Add rows for each model
+                quotaStats.models.forEach(model => {
+                    const tr = document.createElement('tr');
+
+                    // Create progress bar
+                    const progressBar = `
+                        <div style="width: 100%; background-color: #f1f1f1; border-radius: 4px; height: 8px;">
+                            <div style="width: ${model.quota_percentage}%; background-color: ${model.quota_percentage > 80 ? '#ea4335' : '#4285f4'}; border-radius: 4px; height: 8px;"></div>
+                        </div>
+                    `;
+
+                    tr.innerHTML = `
+                        <td style="text-align: left; padding: 5px; border-bottom: 1px solid #eee;">${model.name}</td>
+                        <td style="text-align: right; padding: 5px; border-bottom: 1px solid #eee;">${model.daily_usage.toLocaleString()}</td>
+                        <td style="text-align: right; padding: 5px; border-bottom: 1px solid #eee;">${model.quota_limit.toLocaleString()}</td>
+                        <td style="text-align: right; padding: 5px; border-bottom: 1px solid #eee;">${model.quota_percentage}%</td>
+                        <td style="text-align: left; padding: 5px; border-bottom: 1px solid #eee;">${progressBar}</td>
+                    `;
+
+                    tbody.appendChild(tr);
+                });
+
+                table.appendChild(tbody);
+                quotaContainer.appendChild(table);
+
+                // Add date information
+                const dateInfo = document.createElement('div');
+                dateInfo.style.fontSize = '12px';
+                dateInfo.style.color = '#666';
+                dateInfo.style.marginTop = '5px';
+                dateInfo.textContent = `Data for: ${quotaStats.current_date}`;
+                quotaContainer.appendChild(dateInfo);
             }
         });
     </script>

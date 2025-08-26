@@ -6,7 +6,7 @@ This project uses Google's Gemini AI to play audio files from the `Voice/` direc
 
 ## Overview
 
-The script provides eight modes of operation:
+The script provides nine modes of operation:
 
 1. **Direct mode**: Gemini selects the audio file directly based on your prompt
 2. **Text matching mode**: Match Gemini's response with voice data text
@@ -16,6 +16,7 @@ The script provides eight modes of operation:
 6. **Text-only mode**: Interact with Gemini without audio playback
 7. **RAG mode**: Use Gemini for conversation and local RAG for audio selection (token-efficient)
 8. **Speech RAG mode**: Use speech input with Gemini for conversation and local RAG for audio (token-efficient)
+9. **Zonos voice generation mode**: Generate new voice audio using the Zyphra API for each response
 
 All conversations with Gemini are automatically logged to a `Log.txt` file for future reference.
 
@@ -33,17 +34,25 @@ All conversations with Gemini are automatically logged to a `Log.txt` file for f
 1. Install the Gemini CLI on your system
    - Follow the [official Gemini CLI installation instructions](https://cloud.google.com/gemini/docs/codeassist/gemini-cli)
    - Make sure you've authenticated with the CLI before running this script
-2. Configure the path to the Gemini CLI in the .env file:
-   - Add `GEMINI_CLI_PATH=<path_to_gemini_cli>` to your .env file
-   - Example: `GEMINI_CLI_PATH=C:/Users/username/AppData/Roaming/npm/gemini.cmd`
+2. Create a `.env` file in the project root directory with the following content:
+   ```
+   GEMINI_API_KEY=your_gemini_api_key_here
+   PORT=5000
+   GEMINI_CLI_PATH=path_to_your_gemini_cli
+   SYSTEM_PROMPT_PATH=system_prompt.txt
+   ZONOS_API=your_zonos_api_key_here
+   ```
+   - Replace `your_gemini_api_key_here` with your actual Gemini API key
+   - Replace `path_to_your_gemini_cli` with the path to your Gemini CLI (e.g., `C:/Users/username/AppData/Roaming/npm/gemini.cmd`)
+   - Replace `your_zonos_api_key_here` with your actual Zonos API key if you plan to use Mode 9
 3. (Optional) Configure a custom system prompt:
-   - Create a text file with your system prompt instructions
-   - Add `SYSTEM_PROMPT_PATH=<path_to_system_prompt_file>` to your .env file
-   - Example: `SYSTEM_PROMPT_PATH=system_prompt.txt`
+   - Edit the `system_prompt.txt` file with your custom system prompt instructions
 4. Install required Python packages:
    ```
-   pip install pygame SpeechRecognition pyaudio python-dotenv
+   pip install pygame SpeechRecognition pyaudio python-dotenv flask
    ```
+5. Make sure to keep your `.env` file secure and never commit it to version control
+   - The project's `.gitignore` file is already configured to exclude sensitive files
 
 ## Usage
 
@@ -164,8 +173,28 @@ These optimizations work together to provide a responsive, efficient, and accura
 - `voiceData.csv`: CSV file mapping audio filenames to their text content
 - `Voice/`: Directory containing WAV audio files
 - `Log.txt`: Automatically generated file containing conversation logs
-- `system_prompt.txt`: Optional file containing custom system prompt instructions
-- `.env`: Configuration file for environment variables like the Gemini CLI path
+- `TTS_Log/`: Directory containing text-to-speech log files
+- `system_prompt.txt`: File containing custom system prompt instructions
+- `.env`: Configuration file for environment variables like API keys and paths
+- `.gitignore`: Configuration file specifying which files to exclude from version control
+- `web_interface.py`: Web interface script for the application
+- `templates/`: Directory containing HTML templates for the web interface
+- `static/`: Directory containing static files (CSS, JavaScript) for the web interface
+- `system_prompt_templates/`: Directory containing template system prompts for different modes
+
+## Security
+
+This project uses API keys and other sensitive information that should be kept secure:
+
+- **API Keys**: Never commit your API keys to version control. Store them in the `.env` file, which is excluded by the `.gitignore` file.
+- **Log Files**: Conversation logs may contain sensitive information. The `Log.txt` file and `TTS_Log/` directory are excluded by the `.gitignore` file.
+- **Environment Variables**: The `.env` file contains sensitive information and should never be shared or committed to version control.
+- **Voice Data**: The `Voice/` directory may contain personal voice recordings and is excluded by the `.gitignore` file.
+
+If you fork or clone this repository, make sure to:
+1. Create your own `.env` file with your own API keys
+2. Check that sensitive files are properly excluded by the `.gitignore` file
+3. Regularly review your repository to ensure no sensitive information is accidentally committed
 
 ## Troubleshooting
 

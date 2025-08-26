@@ -1167,3 +1167,574 @@ Attempt 4 failed with status 429. Retrying with backoff... GaxiosError: [{
 Please wait and try again later. To increase your limits, upgrade to a plan with higher limits, or use /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey
 Played audio file: audio27.wav
 --------------------------------------------------
+[2025-08-20 16:22:25] [Error occurred:
+Options:
+  -m, --model                    Model      [string] [default: "gemini-2.5-pro"]
+  -p, --prompt                   Prompt. Appended to input on stdin (if any).
+                                                                        [string]
+  -s, --sandbox                  Run in sandbox?                       [boolean]
+      --sandbox-image            Sandbox image URI.                     [string]
+  -d, --debug                    Run in debug mode?   [boolean] [default: false]
+  -a, --all_files                Include ALL files in context?
+                                                      [boolean] [default: false]
+      --show_memory_usage        Show memory usage in status bar
+                                                      [boolean] [default: false]
+  -y, --yolo                     Automatically accept all actions (aka YOLO
+                                 mode, see
+                                 https://www.youtube.com/watch?v=xvFZjo5PgG0 for
+                                 more details)?       [boolean] [default: false]
+      --telemetry                Enable telemetry? This flag specifically
+                                 controls if telemetry is sent. Other
+                                 --telemetry-* flags set specific values but do
+                                 not enable telemetry on their own.    [boolean]
+      --telemetry-target         Set the telemetry target (local or gcp).
+                                 Overrides settings files.
+                                              [string] [choices: "local", "gcp"]
+      --telemetry-otlp-endpoint  Set the OTLP endpoint for telemetry. Overrides
+                                 environment variables and settings files.
+                                                                        [string]
+      --telemetry-log-prompts    Enable or disable logging of user prompts for
+                                 telemetry. Overrides settings files.  [boolean]
+  -c, --checkpointing            Enables checkpointing of file edits
+                                                      [boolean] [default: false]
+  -v, --version                  Show version number                   [boolean]
+  -h, --help                     Show help                             [boolean]
+
+Unknown arguments: temperature, max-output-tokens, maxOutputTokens, top-k, topK, top-p, topP]
+User: 8
+Gemini: おはよう。
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio36.wav
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-20 16:54:44] [Error occurred:
+Options:
+  -m, --model                    Model      [string] [default: "gemini-2.5-pro"]
+  -p, --prompt                   Prompt. Appended to input on stdin (if any).
+                                                                        [string]
+  -s, --sandbox                  Run in sandbox?                       [boolean]
+      --sandbox-image            Sandbox image URI.                     [string]
+  -d, --debug                    Run in debug mode?   [boolean] [default: false]
+  -a, --all_files                Include ALL files in context?
+                                                      [boolean] [default: false]
+      --show_memory_usage        Show memory usage in status bar
+                                                      [boolean] [default: false]
+  -y, --yolo                     Automatically accept all actions (aka YOLO
+                                 mode, see
+                                 https://www.youtube.com/watch?v=xvFZjo5PgG0 for
+                                 more details)?       [boolean] [default: false]
+      --telemetry                Enable telemetry? This flag specifically
+                                 controls if telemetry is sent. Other
+                                 --telemetry-* flags set specific values but do
+                                 not enable telemetry on their own.    [boolean]
+      --telemetry-target         Set the telemetry target (local or gcp).
+                                 Overrides settings files.
+                                              [string] [choices: "local", "gcp"]
+      --telemetry-otlp-endpoint  Set the OTLP endpoint for telemetry. Overrides
+                                 environment variables and settings files.
+                                                                        [string]
+      --telemetry-log-prompts    Enable or disable logging of user prompts for
+                                 telemetry. Overrides settings files.  [boolean]
+  -c, --checkpointing            Enables checkpointing of file edits
+                                                      [boolean] [default: false]
+  -v, --version                  Show version number                   [boolean]
+  -h, --help                     Show help                             [boolean]
+
+Unknown arguments: temperature, max-output-tokens, maxOutputTokens, top-k, topK, top-p, topP]
+User: 8
+Gemini: 起動。
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio36.wav
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-20 17:00:31] [Error occurred:
+Options:
+  -m, --model                    Model      [string] [default: "gemini-2.5-pro"]
+  -p, --prompt                   Prompt. Appended to input on stdin (if any).
+                                                                        [string]
+  -s, --sandbox                  Run in sandbox?                       [boolean]
+      --sandbox-image            Sandbox image URI.                     [string]
+  -d, --debug                    Run in debug mode?   [boolean] [default: false]
+  -a, --all_files                Include ALL files in context?
+                                                      [boolean] [default: false]
+      --show_memory_usage        Show memory usage in status bar
+                                                      [boolean] [default: false]
+  -y, --yolo                     Automatically accept all actions (aka YOLO
+                                 mode, see
+                                 https://www.youtube.com/watch?v=xvFZjo5PgG0 for
+                                 more details)?       [boolean] [default: false]
+      --telemetry                Enable telemetry? This flag specifically
+                                 controls if telemetry is sent. Other
+                                 --telemetry-* flags set specific values but do
+                                 not enable telemetry on their own.    [boolean]
+      --telemetry-target         Set the telemetry target (local or gcp).
+                                 Overrides settings files.
+                                              [string] [choices: "local", "gcp"]
+      --telemetry-otlp-endpoint  Set the OTLP endpoint for telemetry. Overrides
+                                 environment variables and settings files.
+                                                                        [string]
+      --telemetry-log-prompts    Enable or disable logging of user prompts for
+                                 telemetry. Overrides settings files.  [boolean]
+  -c, --checkpointing            Enables checkpointing of file edits
+                                                      [boolean] [default: false]
+  -v, --version                  Show version number                   [boolean]
+  -h, --help                     Show help                             [boolean]
+
+Unknown arguments: model, gemini-2.5-flash, temperature, 0.7, maxOutputTokens, 500, topK, 40, topP, 0.9, prompt, おはよう。]
+User: 8
+Gemini: おはよう。
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio36.wav
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-20 17:12:43] [Error occurred:
+Options:
+  -m, --model                    Model      [string] [default: "gemini-2.5-pro"]
+  -p, --prompt                   Prompt. Appended to input on stdin (if any).
+                                                                        [string]
+  -s, --sandbox                  Run in sandbox?                       [boolean]
+      --sandbox-image            Sandbox image URI.                     [string]
+  -d, --debug                    Run in debug mode?   [boolean] [default: false]
+  -a, --all_files                Include ALL files in context?
+                                                      [boolean] [default: false]
+      --show_memory_usage        Show memory usage in status bar
+                                                      [boolean] [default: false]
+  -y, --yolo                     Automatically accept all actions (aka YOLO
+                                 mode, see
+                                 https://www.youtube.com/watch?v=xvFZjo5PgG0 for
+                                 more details)?       [boolean] [default: false]
+      --telemetry                Enable telemetry? This flag specifically
+                                 controls if telemetry is sent. Other
+                                 --telemetry-* flags set specific values but do
+                                 not enable telemetry on their own.    [boolean]
+      --telemetry-target         Set the telemetry target (local or gcp).
+                                 Overrides settings files.
+                                              [string] [choices: "local", "gcp"]
+      --telemetry-otlp-endpoint  Set the OTLP endpoint for telemetry. Overrides
+                                 environment variables and settings files.
+                                                                        [string]
+      --telemetry-log-prompts    Enable or disable logging of user prompts for
+                                 telemetry. Overrides settings files.  [boolean]
+  -c, --checkpointing            Enables checkpointing of file edits
+                                                      [boolean] [default: false]
+  -v, --version                  Show version number                   [boolean]
+  -h, --help                     Show help                             [boolean]
+
+Unknown arguments: temperature, max-output-tokens, maxOutputTokens, top-k, topK, top-p, topP]
+User: 8
+Gemini: こんにちは。
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio36.wav
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-20 17:29:10] [Error occurred:
+Options:
+  -m, --model                    Model      [string] [default: "gemini-2.5-pro"]
+  -p, --prompt                   Prompt. Appended to input on stdin (if any).
+                                                                        [string]
+  -s, --sandbox                  Run in sandbox?                       [boolean]
+      --sandbox-image            Sandbox image URI.                     [string]
+  -d, --debug                    Run in debug mode?   [boolean] [default: false]
+  -a, --all_files                Include ALL files in context?
+                                                      [boolean] [default: false]
+      --show_memory_usage        Show memory usage in status bar
+                                                      [boolean] [default: false]
+  -y, --yolo                     Automatically accept all actions (aka YOLO
+                                 mode, see
+                                 https://www.youtube.com/watch?v=xvFZjo5PgG0 for
+                                 more details)?       [boolean] [default: false]
+      --telemetry                Enable telemetry? This flag specifically
+                                 controls if telemetry is sent. Other
+                                 --telemetry-* flags set specific values but do
+                                 not enable telemetry on their own.    [boolean]
+      --telemetry-target         Set the telemetry target (local or gcp).
+                                 Overrides settings files.
+                                              [string] [choices: "local", "gcp"]
+      --telemetry-otlp-endpoint  Set the OTLP endpoint for telemetry. Overrides
+                                 environment variables and settings files.
+                                                                        [string]
+      --telemetry-log-prompts    Enable or disable logging of user prompts for
+                                 telemetry. Overrides settings files.  [boolean]
+  -c, --checkpointing            Enables checkpointing of file edits
+                                                      [boolean] [default: false]
+  -v, --version                  Show version number                   [boolean]
+  -h, --help                     Show help                             [boolean]
+
+Unknown arguments: temperature, max-output-tokens, maxOutputTokens, top-k, topK, top-p, topP]
+User: 8
+Gemini: こんにちは。
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio36.wav
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-20 18:04:13] [Error occurred:
+Options:
+  -m, --model                    Model      [string] [default: "gemini-2.5-pro"]
+  -p, --prompt                   Prompt. Appended to input on stdin (if any).
+                                                                        [string]
+  -s, --sandbox                  Run in sandbox?                       [boolean]
+      --sandbox-image            Sandbox image URI.                     [string]
+  -d, --debug                    Run in debug mode?   [boolean] [default: false]
+  -a, --all_files                Include ALL files in context?
+                                                      [boolean] [default: false]
+      --show_memory_usage        Show memory usage in status bar
+                                                      [boolean] [default: false]
+  -y, --yolo                     Automatically accept all actions (aka YOLO
+                                 mode, see
+                                 https://www.youtube.com/watch?v=xvFZjo5PgG0 for
+                                 more details)?       [boolean] [default: false]
+      --telemetry                Enable telemetry? This flag specifically
+                                 controls if telemetry is sent. Other
+                                 --telemetry-* flags set specific values but do
+                                 not enable telemetry on their own.    [boolean]
+      --telemetry-target         Set the telemetry target (local or gcp).
+                                 Overrides settings files.
+                                              [string] [choices: "local", "gcp"]
+      --telemetry-otlp-endpoint  Set the OTLP endpoint for telemetry. Overrides
+                                 environment variables and settings files.
+                                                                        [string]
+      --telemetry-log-prompts    Enable or disable logging of user prompts for
+                                 telemetry. Overrides settings files.  [boolean]
+  -c, --checkpointing            Enables checkpointing of file edits
+                                                      [boolean] [default: false]
+  -v, --version                  Show version number                   [boolean]
+  -h, --help                     Show help                             [boolean]
+
+Unknown arguments: temperature, max-output-tokens, maxOutputTokens, top-k, topK, top-p, topP]
+User: 8
+Gemini: こんにちは。
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio36.wav
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-20 19:34:10] [Error occurred:
+Options:
+  -m, --model                    Model      [string] [default: "gemini-2.5-pro"]
+  -p, --prompt                   Prompt. Appended to input on stdin (if any).
+                                                                        [string]
+  -s, --sandbox                  Run in sandbox?                       [boolean]
+      --sandbox-image            Sandbox image URI.                     [string]
+  -d, --debug                    Run in debug mode?   [boolean] [default: false]
+  -a, --all_files                Include ALL files in context?
+                                                      [boolean] [default: false]
+      --show_memory_usage        Show memory usage in status bar
+                                                      [boolean] [default: false]
+  -y, --yolo                     Automatically accept all actions (aka YOLO
+                                 mode, see
+                                 https://www.youtube.com/watch?v=xvFZjo5PgG0 for
+                                 more details)?       [boolean] [default: false]
+      --telemetry                Enable telemetry? This flag specifically
+                                 controls if telemetry is sent. Other
+                                 --telemetry-* flags set specific values but do
+                                 not enable telemetry on their own.    [boolean]
+      --telemetry-target         Set the telemetry target (local or gcp).
+                                 Overrides settings files.
+                                              [string] [choices: "local", "gcp"]
+      --telemetry-otlp-endpoint  Set the OTLP endpoint for telemetry. Overrides
+                                 environment variables and settings files.
+                                                                        [string]
+      --telemetry-log-prompts    Enable or disable logging of user prompts for
+                                 telemetry. Overrides settings files.  [boolean]
+  -c, --checkpointing            Enables checkpointing of file edits
+                                                      [boolean] [default: false]
+  -v, --version                  Show version number                   [boolean]
+  -h, --help                     Show help                             [boolean]
+
+Unknown arguments: temperature, max-output-tokens, maxOutputTokens, top-k, topK, top-p, topP]
+User: 8
+Gemini: こんにちは。
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio36.wav
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-20 19:58:12] [こんにちは！何かお手伝いできることはありますか？]
+User: 8
+Gemini: こんにちは。
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio22.wav
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 17:05:22] [こんにちは！何かお手伝いできることはありますか？]
+User: 8
+Gemini: こんにちは
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio22.wav
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 17:29:14] [こんにちは！テストメッセージありがとうございます。]
+User: 9
+Gemini: こんにちは！これはテストです
+--------------------------------------------------
+[2025-08-25 17:48:00] [こんにちは！何かお手伝いできることはありますか？]
+User: 9
+Gemini: こんにちは
+--------------------------------------------------
+[2025-08-25 17:55:07] [私はGoogleによってトレーニングされた、大規模言語モデルです。]
+User: 9
+Gemini: アナタは誰？
+--------------------------------------------------
+[2025-08-25 18:11:45] [こんにちは！何かお手伝いできることはありますか？]
+User: 9
+Gemini: こんにちは
+--------------------------------------------------
+[2025-08-25 18:19:30] [こんにちは！お話ししましょう。何かお手伝いできることはありますか？]
+User: 9
+Gemini: こんにちは　おはなししよ
+--------------------------------------------------
+[2025-08-25 18:26:17] [私はAIなので元気かどうかは言えませんが、いつでもお手伝いできます。何かお手伝いできることはありますか？]
+User: 9
+Gemini: げんき？
+--------------------------------------------------
+[2025-08-25 22:28:24] [こんにちは！何かお手伝いできることはありますか？]
+User: 9
+Gemini: こんにちは！
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio20250825222824.webm
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 22:34:49] [こんにちは！何かお手伝いできることはありますか？]
+User: 9
+Gemini: こんにちは
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio20250825223449.webm
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 22:43:35] [私はGoogleによってトレーニングされた、大規模言語モデルです。]
+User: 9
+Gemini: こんにちは あなたは誰ですか
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio20250825224335.webm
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 22:44:05] [私はGoogleによってトレーニングされた、大規模言語モデルです。特定の名前はありません。]
+User: 9
+Gemini: 違うでしょ あなたの名前は違うでしょ
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio20250825224405.webm
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 23:00:51] [I apologize, but I need to focus on your current question. Could you please repeat what you'd like to know?]
+User: 9
+Gemini: やあこんにちは 元気
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio20250825230051.webm
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 23:03:04] [はい、日本語で回答します。]
+User: 9
+Gemini: 日本語で答えてくれる
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio20250825230304.webm
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 23:03:33] [はい、私はラシア。あなたの質問に答え、手助けをするためにここにいるわ。クールだけど、困っている人には手を差し伸べるのが好き。よろしくね。]
+User: 9
+Gemini: あなたについて教えて
+
+--- FULL PROMPT SENT TO GEMINI ---
+audio20250825230333.webm
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 23:15:30] [I apologize, but I need to focus on your current question. Could you please repeat what you'd like to know?]
+User: 9
+Gemini: よろしく
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 23:25:35] [I apologize, but I need to focus on your current question. Could you please repeat what you'd like to know?]
+User: 9
+Gemini: 起動してください
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 23:49:48] [I apologize, but I need to focus on your current question. Could you please repeat what you'd like to know?]
+User: 9
+Gemini: こんにちは
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-25 23:52:03] [I apologize, but I need to focus on your current question. Could you please repeat what you'd like to know?]
+User: 9
+Gemini: こんばんは
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-26 00:06:03] [I apologize, but I need to focus on your current question. Could you please repeat what you'd like to know?]
+User: 9
+Gemini: こんばんは元気
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-26 07:54:10] [申し訳ありませんが、現在のご質問に集中する必要があります。もう一度お知りになりたいことをお教えいただけますか？]
+User: 9
+Gemini: おはようございます 今日は何月何日ですか
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-26 07:55:22] [申し訳ありませんが、現在のご質問に集中する必要があります。もう一度お知りになりたいことをお教えいただけますか？]
+User: 9
+Gemini: 現在何のタスク やってんですか
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-26 08:02:14] [申し訳ありませんが、現在のご質問に集中する必要があります。もう一度お知りになりたいことをお教えいただけますか？]
+User: 9
+Gemini: おはようございます 今は何時ですか
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-26 08:13:38] [はい、承知いたしました。]
+User: 9
+Gemini: おはようございます 今何時
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-26 08:42:43] [はい、承知いたしました。私の名前はプネウマで、ユーザーとの自然な会話を行う高度なAIアシスタントとして、今後もサポートさせていただきます。]
+User: 9
+Gemini: おはようございます今の時間を教えてもらえますか
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-26 08:43:08] [はい、承知いたしました。私の名前はプネウマで、高度なAIアシスタントとして、ユーザー様との自然な会話を行う役割を担っております。]
+User: 9
+Gemini: あなたの名前ではなく今の時間を教えて欲しいです
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-26 08:43:29] [はい、承知いたしました。私の名前はプネウマです。ユーザー様との自然な会話をサポートさせていただきます。]
+User: 9
+Gemini: 全然会話ができていないですよね
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-26 08:43:42] [はい、承知いたしました。私の名前はプネウマで、高度なAIアシスタントとして、ユーザー様との自然な会話を行う役割を担っています。]
+User: 9
+Gemini: 承知しないで
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-26 10:14:54] [Error occurred:
+Options:
+  -m, --model                    Model      [string] [default: "gemini-2.5-pro"]
+  -p, --prompt                   Prompt. Appended to input on stdin (if any).
+                                                                        [string]
+  -s, --sandbox                  Run in sandbox?                       [boolean]
+      --sandbox-image            Sandbox image URI.                     [string]
+  -d, --debug                    Run in debug mode?   [boolean] [default: false]
+  -a, --all_files                Include ALL files in context?
+                                                      [boolean] [default: false]
+      --show_memory_usage        Show memory usage in status bar
+                                                      [boolean] [default: false]
+  -y, --yolo                     Automatically accept all actions (aka YOLO
+                                 mode, see
+                                 https://www.youtube.com/watch?v=xvFZjo5PgG0 for
+                                 more details)?       [boolean] [default: false]
+      --telemetry                Enable telemetry? This flag specifically
+                                 controls if telemetry is sent. Other
+                                 --telemetry-* flags set specific values but do
+                                 not enable telemetry on their own.    [boolean]
+      --telemetry-target         Set the telemetry target (local or gcp).
+                                 Overrides settings files.
+                                              [string] [choices: "local", "gcp"]
+      --telemetry-otlp-endpoint  Set the OTLP endpoint for telemetry. Overrides
+                                 environment variables and settings files.
+                                                                        [string]
+      --telemetry-log-prompts    Enable or disable logging of user prompts for
+                                 telemetry. Overrides settings files.  [boolean]
+  -c, --checkpointing            Enables checkpointing of file edits
+                                                      [boolean] [default: false]
+  -v, --version                  Show version number                   [boolean]
+  -h, --help                     Show help                             [boolean]
+
+Unknown arguments: system, text, chat
+]
+User: 9
+Gemini: こんにちは 今何時
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-26 10:15:16] [Error occurred:
+Options:
+  -m, --model                    Model      [string] [default: "gemini-2.5-pro"]
+  -p, --prompt                   Prompt. Appended to input on stdin (if any).
+                                                                        [string]
+  -s, --sandbox                  Run in sandbox?                       [boolean]
+      --sandbox-image            Sandbox image URI.                     [string]
+  -d, --debug                    Run in debug mode?   [boolean] [default: false]
+  -a, --all_files                Include ALL files in context?
+                                                      [boolean] [default: false]
+      --show_memory_usage        Show memory usage in status bar
+                                                      [boolean] [default: false]
+  -y, --yolo                     Automatically accept all actions (aka YOLO
+                                 mode, see
+                                 https://www.youtube.com/watch?v=xvFZjo5PgG0 for
+                                 more details)?       [boolean] [default: false]
+      --telemetry                Enable telemetry? This flag specifically
+                                 controls if telemetry is sent. Other
+                                 --telemetry-* flags set specific values but do
+                                 not enable telemetry on their own.    [boolean]
+      --telemetry-target         Set the telemetry target (local or gcp).
+                                 Overrides settings files.
+                                              [string] [choices: "local", "gcp"]
+      --telemetry-otlp-endpoint  Set the OTLP endpoint for telemetry. Overrides
+                                 environment variables and settings files.
+                                                                        [string]
+      --telemetry-log-prompts    Enable or disable logging of user prompts for
+                                 telemetry. Overrides settings files.  [boolean]
+  -c, --checkpointing            Enables checkpointing of file edits
+                                                      [boolean] [default: false]
+  -v, --version                  Show version number                   [boolean]
+  -h, --help                     Show help                             [boolean]
+
+Unknown arguments: system, history, text, chat
+]
+User: 9
+Gemini: 今何時？
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
