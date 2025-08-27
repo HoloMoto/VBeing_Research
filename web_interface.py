@@ -24,6 +24,40 @@ from play_voice_with_gemini import (
     load_system_prompt
 )
 
+def is_error_response(response):
+    """
+    Check if a Gemini response contains an error.
+
+    Args:
+        response (str): The response from Gemini
+
+    Returns:
+        bool: True if the response contains an error, False otherwise
+    """
+    if not response:
+        return True
+
+    # Check for explicit error indicators
+    error_indicators = [
+        "Error:", 
+        "not found", 
+        "quota", 
+        "rate limit",
+        "エラー",
+        "申し訳ありません",
+        "I apologize",
+        "I'm sorry",
+        "I cannot",
+        "I'm not able to",
+        "I am unable to"
+    ]
+
+    for indicator in error_indicators:
+        if indicator.lower() in response.lower():
+            return True
+
+    return False
+
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
 
@@ -288,6 +322,20 @@ def send_message():
             # Query Gemini with the selected model if available
             gemini_response = query_with_retries(models, conversation_history, preferred_model=current_model, system_prompt=system_prompt)
 
+            # Check if the Gemini response contains an error
+            if is_error_response(gemini_response):
+                print(f"Error detected in Gemini response, skipping Zonos processing: {gemini_response[:100]}...")
+                # Add Gemini's response to conversation history
+                conversation_history.append({"role": "model", "parts": [gemini_response]})
+                # Return the error response to the user without calling Zonos
+                return jsonify({
+                    'status': 'warning',
+                    'response': gemini_response,
+                    'audio_file': None,
+                    'model_used': current_model or 'auto',
+                    'message': 'Geminiの応答にエラーが検出されたため、音声生成をスキップしました。'
+                })
+
             # Check if clone voice is specified
             use_clone_voice = data.get('use_clone_voice', False)
             clone_voice_file = data.get('clone_voice_file', None)
@@ -304,7 +352,7 @@ def send_message():
             audio_file = None
 
             # Start asynchronous voice generation
-            def generate_and_play_voice():
+            def generate_and_save_voice():
                 nonlocal audio_file
                 try:
                     # Generate voice using Zonos API
@@ -323,42 +371,39 @@ def send_message():
                     )
 
                     if audio_data:
-                        # Generate a temporary filename for immediate playback
-                        import tempfile
-                        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm', dir='Voice')
-                        temp_filename = os.path.basename(temp_file.name)
-                        temp_path = temp_file.name
+                        # Store the audio data in a global cache for streaming to the browser
+                        # This will be accessed by the /api/stream_audio endpoint
+                        audio_cache_key = f"audio_{int(time.time() * 1000)}"
+                        if not hasattr(app, 'audio_cache'):
+                            app.audio_cache = {}
+                        app.audio_cache[audio_cache_key] = {
+                            'data': audio_data,
+                            'timestamp': time.time(),
+                            'content_type': 'audio/webm'
+                        }
 
-                        # Important: Close the file handle explicitly
-                        temp_file.close()
-
-                        # Write to temporary file for immediate playback
-                        with open(temp_path, "wb") as f:
-                            f.write(audio_data)
-
-                        # Add a small delay to ensure file system operations complete
-                        time.sleep(0.1)
-
-                        # Play audio immediately from temporary file
-                        # Use the absolute path directly, don't join with current working directory
-                        play_audio(temp_path)
+                        # Set the audio_file to the cache key for the frontend to use
+                        audio_file = audio_cache_key
 
                         # Save the audio data properly and update CSV in the background
+                        # This happens asynchronously while the browser is already playing the audio
                         filename = save_zonos_voice_data(audio_data, gemini_response)
 
-                        # Update the audio_file variable with the permanent filename
-                        audio_file = filename
+                        # Update the permanent filename in the cache for future reference
+                        if audio_cache_key in app.audio_cache:
+                            app.audio_cache[audio_cache_key]['permanent_filename'] = filename
 
-                        # Clean up temporary file after permanent file is saved
-                        try:
-                            os.unlink(temp_path)
-                        except:
-                            pass
+                        # Clean up old cache entries (older than 10 minutes)
+                        current_time = time.time()
+                        keys_to_remove = [k for k, v in app.audio_cache.items() 
+                                         if current_time - v['timestamp'] > 600]
+                        for k in keys_to_remove:
+                            del app.audio_cache[k]
                 except Exception as e:
                     print(f"Error in asynchronous voice generation: {e}")
 
             # Start the voice generation in a separate thread
-            threading.Thread(target=generate_and_play_voice).start()
+            threading.Thread(target=generate_and_save_voice).start()
 
         elif current_mode in [1, 2, 5, 7, 8]:  # Direct, Text matching, Speech, RAG, or Speech RAG mode
             # Query Gemini with the selected model if available
@@ -388,7 +433,8 @@ def send_message():
                 'response': gemini_response,
                 'audio_file': 'generating',  # Placeholder value
                 'model_used': current_model or 'auto',
-                'async_audio': True  # Flag to indicate async audio generation
+                'async_audio': True,  # Flag to indicate async audio generation
+                'stream_audio': True  # Flag to indicate that audio should be streamed from the API
             })
         else:
             # For other modes, log the conversation normally
@@ -449,7 +495,7 @@ def direct_tts():
         audio_file = None
 
         # Start asynchronous voice generation
-        def generate_and_play_voice():
+        def generate_and_save_voice():
             nonlocal audio_file
             try:
                 # Generate voice using Zonos API
@@ -468,48 +514,46 @@ def direct_tts():
                 )
 
                 if audio_data:
-                    # Generate a temporary filename for immediate playback
-                    import tempfile
-                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm', dir='Voice')
-                    temp_filename = os.path.basename(temp_file.name)
-                    temp_path = temp_file.name
+                    # Store the audio data in a global cache for streaming to the browser
+                    # This will be accessed by the /api/stream_audio endpoint
+                    audio_cache_key = f"audio_{int(time.time() * 1000)}"
+                    if not hasattr(app, 'audio_cache'):
+                        app.audio_cache = {}
+                    app.audio_cache[audio_cache_key] = {
+                        'data': audio_data,
+                        'timestamp': time.time(),
+                        'content_type': 'audio/webm'
+                    }
 
-                    # Important: Close the file handle explicitly
-                    temp_file.close()
-
-                    # Write to temporary file for immediate playback
-                    with open(temp_path, "wb") as f:
-                        f.write(audio_data)
-
-                    # Add a small delay to ensure file system operations complete
-                    time.sleep(0.1)
-
-                    # Play audio immediately from temporary file
-                    # Use the absolute path directly, don't join with current working directory
-                    play_audio(temp_path)
+                    # Set the audio_file to the cache key for the frontend to use
+                    audio_file = audio_cache_key
 
                     # Save the audio data properly and update CSV in the background
+                    # This happens asynchronously while the browser is already playing the audio
                     filename = save_zonos_voice_data(audio_data, text)
 
-                    # Update the audio_file variable with the permanent filename
-                    audio_file = filename
+                    # Update the permanent filename in the cache for future reference
+                    if audio_cache_key in app.audio_cache:
+                        app.audio_cache[audio_cache_key]['permanent_filename'] = filename
 
-                    # Clean up temporary file after permanent file is saved
-                    try:
-                        os.unlink(temp_path)
-                    except:
-                        pass
+                    # Clean up old cache entries (older than 10 minutes)
+                    current_time = time.time()
+                    keys_to_remove = [k for k, v in app.audio_cache.items() 
+                                     if current_time - v['timestamp'] > 600]
+                    for k in keys_to_remove:
+                        del app.audio_cache[k]
             except Exception as e:
                 print(f"Error in asynchronous voice generation: {e}")
 
         # Start the voice generation in a separate thread
-        threading.Thread(target=generate_and_play_voice).start()
+        threading.Thread(target=generate_and_save_voice).start()
 
         # Return a response immediately
         return jsonify({
             'status': 'success',
             'message': '音声生成を開始しました。生成が完了すると自動的に再生されます。',
-            'audio_file': 'generating'  # Placeholder value
+            'audio_file': 'generating',  # Placeholder value
+            'stream_audio': True  # Flag to indicate that audio should be streamed from the API
         })
 
     except Exception as e:
@@ -565,6 +609,86 @@ def serve_audio(filename):
         }), 404
 
     return send_from_directory(audio_dir, filename)
+
+@app.route('/api/stream_audio/<cache_key>')
+def stream_audio(cache_key):
+    """Stream audio data directly from memory cache"""
+    if not hasattr(app, 'audio_cache') or cache_key not in app.audio_cache:
+        return jsonify({
+            'status': 'error',
+            'message': f'Audio data for key {cache_key} not found in cache'
+        }), 404
+
+    # Get the audio data from the cache
+    audio_entry = app.audio_cache[cache_key]
+    audio_data = audio_entry['data']
+    content_type = audio_entry.get('content_type', 'audio/webm')
+
+    # Return the audio data with the appropriate content type
+    response = app.response_class(
+        response=audio_data,
+        status=200,
+        mimetype=content_type
+    )
+
+    # Set cache control headers to prevent caching
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+
+    return response
+
+@app.route('/api/check_audio_status')
+def check_audio_status():
+    """Check if audio data is available in the cache"""
+    if not hasattr(app, 'audio_cache') or not app.audio_cache:
+        return jsonify({
+            'status': 'pending',
+            'message': 'No audio data available yet'
+        })
+
+    # Find the most recent audio entry
+    most_recent_key = None
+    most_recent_time = 0
+
+    for key, entry in app.audio_cache.items():
+        if entry['timestamp'] > most_recent_time:
+            most_recent_time = entry['timestamp']
+            most_recent_key = key
+
+    if most_recent_key:
+        # Check if the entry is recent (within the last 10 seconds)
+        if time.time() - most_recent_time < 10:
+            return jsonify({
+                'status': 'success',
+                'audio_key': most_recent_key,
+                'timestamp': most_recent_time
+            })
+
+    # No recent audio data found
+    return jsonify({
+        'status': 'pending',
+        'message': 'No recent audio data available'
+    })
+
+@app.route('/api/convert_audio', methods=['POST'])
+def convert_audio():
+    """Trigger batch conversion of webm files to wav format"""
+    try:
+        from play_voice_with_gemini import batch_convert_webm_to_wav
+
+        # Start the conversion in a background thread to avoid blocking the response
+        threading.Thread(target=batch_convert_webm_to_wav).start()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Batch conversion started in the background'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error starting batch conversion: {str(e)}'
+        }), 500
 
 # System Prompt API Endpoints
 @app.route('/api/system_prompt/current', methods=['GET'])

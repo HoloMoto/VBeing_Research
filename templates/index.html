@@ -266,6 +266,16 @@
                     <div id="system-prompt-status" style="margin-top: 10px; font-size: 14px; color: #666;"></div>
                 </div>
 
+                <!-- Audio Conversion Tools -->
+                <div class="audio-conversion" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px;">音声変換ツール</h3>
+                    <div style="margin-bottom: 10px; font-size: 12px; color: #666;">
+                        保存されたwebm音声ファイルをwav形式に変換します。研究や解析用途に便利です。
+                    </div>
+                    <button id="convert-audio-btn" class="action-btn" style="width: 100%;">すべての音声ファイルをWAVに変換</button>
+                    <div id="conversion-status" style="margin-top: 10px; font-size: 14px; color: #666;"></div>
+                </div>
+
                 <!-- Quota Usage Display -->
                 <div class="quota-usage" id="quota-usage" style="margin-top: 15px; display: none;">
                     <h3 style="font-size: 16px; margin-bottom: 10px;">Gemini API Quota Usage</h3>
@@ -326,6 +336,9 @@
 
             // Initialize system prompt editor
             initializeSystemPromptEditor();
+
+            // Initialize audio conversion tools
+            initializeAudioConversion();
 
             // Functions
             async function initializeApp() {
@@ -644,8 +657,19 @@
                                 if (lastMessage) {
                                     lastMessage.appendChild(asyncNote);
                                 }
+
+                                // If streaming is enabled, start polling for the audio data
+                                if (data.stream_audio) {
+                                    pollForAudioData(lastMessage);
+                                }
+                            } else if (data.stream_audio && data.audio_file.startsWith('audio_')) {
+                                // This is a streaming audio file (cache key)
+                                statusEl.textContent = `Streaming audio: ${data.audio_file}`;
+
+                                // Stream the audio directly from the API
+                                streamAudio(data.audio_file);
                             } else {
-                                // Regular audio file, play it
+                                // Regular audio file, play it from the file system
                                 statusEl.textContent = `Playing audio: ${data.audio_file}`;
 
                                 // Create audio element
@@ -671,6 +695,113 @@
                             }
                         } else {
                             statusEl.textContent = 'Ready';
+                        }
+
+                        // Function to poll for audio data
+                        function pollForAudioData(messageElement) {
+                            let pollCount = 0;
+                            const maxPolls = 60; // Maximum number of polling attempts (30 seconds at 500ms intervals)
+                            const pollInterval = 500; // Poll every 500ms
+
+                            const poll = async () => {
+                                try {
+                                    // Check if we've reached the maximum number of polls
+                                    if (pollCount >= maxPolls) {
+                                        console.error('Maximum polling attempts reached. Audio generation may have failed.');
+                                        statusEl.textContent = '音声生成がタイムアウトしました。';
+
+                                        // Update the async note
+                                        const asyncNote = messageElement.querySelector('.async-note');
+                                        if (asyncNote) {
+                                            asyncNote.textContent = '(音声生成に失敗しました)';
+                                            asyncNote.style.color = '#ea4335';
+                                        }
+                                        return;
+                                    }
+
+                                    pollCount++;
+
+                                    // Check for new messages in the conversation
+                                    const response = await fetch('/api/check_audio_status');
+                                    const data = await response.json();
+
+                                    if (data.status === 'success' && data.audio_key) {
+                                        // Audio is ready, stream it
+                                        streamAudio(data.audio_key);
+
+                                        // Update the async note
+                                        const asyncNote = messageElement.querySelector('.async-note');
+                                        if (asyncNote) {
+                                            asyncNote.textContent = '(音声再生中)';
+                                            asyncNote.style.color = '#34a853';
+                                        }
+                                    } else {
+                                        // Audio not ready yet, continue polling
+                                        setTimeout(poll, pollInterval);
+                                    }
+                                } catch (error) {
+                                    console.error('Error polling for audio data:', error);
+                                    statusEl.textContent = '音声データの取得中にエラーが発生しました。';
+
+                                    // Update the async note
+                                    const asyncNote = messageElement.querySelector('.async-note');
+                                    if (asyncNote) {
+                                        asyncNote.textContent = '(音声生成に失敗しました)';
+                                        asyncNote.style.color = '#ea4335';
+                                    }
+                                }
+                            };
+
+                            // Start polling
+                            setTimeout(poll, pollInterval);
+                        }
+
+                        // Function to stream audio from the API
+                        async function streamAudio(audioKey) {
+                            try {
+                                statusEl.textContent = `Streaming audio: ${audioKey}`;
+
+                                // Fetch the audio data from the API
+                                const response = await fetch(`/api/stream_audio/${audioKey}`);
+
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+
+                                // Get the audio data as a blob
+                                const audioBlob = await response.blob();
+
+                                // Create a URL for the blob
+                                const audioUrl = URL.createObjectURL(audioBlob);
+
+                                // Create an audio element
+                                const audio = new Audio(audioUrl);
+
+                                // Add event listeners for future character animation
+                                audio.addEventListener('play', function() {
+                                    // Hook for future 3D character speaking animation
+                                    if (window.GeminiCharacter && window.character) {
+                                        window.character.speak(audio.duration * 1000);
+                                    }
+                                });
+
+                                audio.addEventListener('ended', function() {
+                                    // Hook for future 3D character idle animation
+                                    if (window.GeminiCharacter && window.character) {
+                                        window.character.idle();
+                                    }
+                                    statusEl.textContent = 'Ready';
+
+                                    // Clean up the blob URL
+                                    URL.revokeObjectURL(audioUrl);
+                                });
+
+                                // Play the audio
+                                audio.play();
+                            } catch (error) {
+                                console.error('Error streaming audio:', error);
+                                statusEl.textContent = '音声のストリーミング中にエラーが発生しました。';
+                            }
                         }
                     } else {
                         statusEl.textContent = `Error: ${data.message}`;
@@ -1166,6 +1297,54 @@
                         console.error('Delete template error:', error);
                     }
                 }
+            }
+
+            // Initialize audio conversion tools
+            function initializeAudioConversion() {
+                const convertAudioBtn = document.getElementById('convert-audio-btn');
+                const conversionStatus = document.getElementById('conversion-status');
+
+                // Add event listener for convert audio button
+                convertAudioBtn.addEventListener('click', async function() {
+                    try {
+                        // Disable button and show loading status
+                        convertAudioBtn.disabled = true;
+                        conversionStatus.textContent = '変換処理を開始しています...';
+                        conversionStatus.style.color = '#666';
+
+                        // Call the API to start the conversion
+                        const response = await fetch('/api/convert_audio', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        const data = await response.json();
+
+                        if (data.status === 'success') {
+                            conversionStatus.textContent = `成功: ${data.message}`;
+                            conversionStatus.style.color = '#34a853';
+
+                            // Add a note about the background processing
+                            setTimeout(() => {
+                                conversionStatus.textContent += ' 変換は裏で実行されています。完了までに時間がかかる場合があります。';
+                            }, 2000);
+                        } else {
+                            conversionStatus.textContent = `エラー: ${data.message}`;
+                            conversionStatus.style.color = '#ea4335';
+                        }
+                    } catch (error) {
+                        conversionStatus.textContent = `エラー: ${error.message}`;
+                        conversionStatus.style.color = '#ea4335';
+                        console.error('Audio conversion error:', error);
+                    } finally {
+                        // Re-enable button after a delay
+                        setTimeout(() => {
+                            convertAudioBtn.disabled = false;
+                        }, 5000);
+                    }
+                });
             }
 
             // Load clone voices for direct TTS

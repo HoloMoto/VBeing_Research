@@ -555,9 +555,9 @@ def save_zonos_voice_data(audio_data, text):
             print("No audio data to save")
             return None
 
-        # Generate a filename with sequential numbering
-        next_number = get_next_audio_number()
-        filename = f"audio{next_number}.webm"
+        # Generate a filename with timestamp
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = f"audio{timestamp}.webm"
         file_path = os.path.join(VOICE_DIR, filename)
 
         print(f"Saving audio data to: {file_path}")
@@ -569,10 +569,116 @@ def save_zonos_voice_data(audio_data, text):
         # Update voice data CSV
         update_voice_data_csv(filename, text)
 
+        # Schedule wav conversion in the background
+        threading.Thread(target=convert_webm_to_wav, args=(file_path,)).start()
+
         return filename
     except Exception as e:
         print(f"Error saving audio data: {e}")
         return None
+
+def convert_webm_to_wav(webm_path):
+    """
+    Convert a webm file to wav format using pydub.
+    This function is designed to be run in a background thread.
+
+    Args:
+        webm_path: Path to the webm file to convert
+
+    Returns:
+        Path to the converted wav file or None if conversion failed
+    """
+    try:
+        # Check if the file exists
+        if not os.path.exists(webm_path):
+            print(f"Webm file not found: {webm_path}")
+            return None
+
+        # Generate the output path
+        wav_path = os.path.splitext(webm_path)[0] + ".wav"
+
+        # Check if pydub is available
+        try:
+            from pydub import AudioSegment
+
+            print(f"Converting {webm_path} to {wav_path} using pydub...")
+
+            # Load the webm file
+            audio = AudioSegment.from_file(webm_path, format="webm")
+
+            # Export as wav
+            audio.export(wav_path, format="wav")
+
+            print(f"Conversion successful: {wav_path}")
+            return wav_path
+        except ImportError:
+            # If pydub is not available, try using ffmpeg directly
+            print("Pydub not available, trying ffmpeg directly...")
+
+            # Check if ffmpeg is available
+            try:
+                # Construct the ffmpeg command
+                ffmpeg_cmd = [
+                    "ffmpeg",
+                    "-i", webm_path,
+                    "-y",  # Overwrite output file if it exists
+                    wav_path
+                ]
+
+                # Run the command
+                result = subprocess.run(
+                    ffmpeg_cmd,
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+
+                print(f"Conversion successful: {wav_path}")
+                return wav_path
+            except subprocess.CalledProcessError as e:
+                print(f"Error running ffmpeg: {e}")
+                print(f"ffmpeg stderr: {e.stderr}")
+                return None
+            except Exception as e:
+                print(f"Error using ffmpeg: {e}")
+                return None
+    except Exception as e:
+        print(f"Error converting webm to wav: {e}")
+        return None
+
+def batch_convert_webm_to_wav():
+    """
+    Batch convert all webm files in the Voice directory to wav format.
+    This function can be called manually or scheduled to run periodically.
+    """
+    try:
+        print("Starting batch conversion of webm files to wav...")
+
+        # Get all webm files in the Voice directory
+        webm_files = [f for f in os.listdir(VOICE_DIR) if f.endswith('.webm')]
+
+        if not webm_files:
+            print("No webm files found in Voice directory")
+            return
+
+        print(f"Found {len(webm_files)} webm files to convert")
+
+        # Convert each file
+        for webm_file in webm_files:
+            webm_path = os.path.join(VOICE_DIR, webm_file)
+            wav_path = os.path.splitext(webm_path)[0] + ".wav"
+
+            # Skip if wav file already exists
+            if os.path.exists(wav_path):
+                print(f"Skipping {webm_file} - wav file already exists")
+                continue
+
+            # Convert the file
+            convert_webm_to_wav(webm_path)
+
+        print("Batch conversion completed")
+    except Exception as e:
+        print(f"Error in batch conversion: {e}")
 
 def generate_zonos_voice(text, voice_id="default", use_clone_voice=False, clone_voice_file=None, max_retries=3, language_code=None, system_prompt=None):
     """
