@@ -1,5 +1,6 @@
 # Voice Playback with Gemini
 
+
 [日本語版はこちら (Japanese Version)](README_JP.md)
 
 This project uses Google's Gemini AI to play audio files from the `Voice/` directory according to the data in `voiceData.csv`.
