@@ -2071,3 +2071,52 @@ Gemini: こんにちは あなたについて教えてください
 generating
 --- END OF FULL PROMPT ---
 --------------------------------------------------
+[2025-08-27 18:57:45] [こんにちは、ドラえもんさん！
+]
+User: 9
+Gemini: こんにちは 僕ドラえもんです
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-27 18:58:46] [最新のGeminiモデルは、2025年8月26日にリリースされた画像生成・編集に特化した「Gemini 2.5 Flash Image」と、2025年8月1日にGoogle AI Ultra加入者向けに展開された「Gemini 2.5 Deep Think」です。
+
+Gemini 2.5 Flash Imageは、低遅延で費用対効果の高い画像生成・編集モデルで、生成された画像にはSynthIDデジタル透かしが含まれます。
+
+Gemini 2.5 Deep Thinkは、国際数学オリンピック（IMO）で金メダルを獲得したモデルのバリエーションで、日常業務により速く、使いやすくなっています。
+]
+User: 9
+Gemini: 今日の 地味にの最新に出たモデル
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-27 18:58:57] [私は元気です。何かお手伝いできることはありますか？
+]
+User: 9
+Gemini: 元気ですか
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-27 19:03:58] [こんにちは！何かお手伝いできることはありますか？
+]
+User: 9
+Gemini: こんにちは
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-27 19:04:22] [私の名前はプネウマで、高度なAIアシスタントです。
+]
+User: 9
+Gemini: あなたの名前は
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
