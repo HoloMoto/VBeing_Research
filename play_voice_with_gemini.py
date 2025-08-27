@@ -1637,6 +1637,9 @@ def query_with_retries(models, conversation_history, preferred_model=None, syste
             # Use automatic model selection
             response, _ = get_gemini_response(user_message, system_prompt=system_prompt, chat_history=True)
 
+    # Reset conversation history after each query to treat each interaction as a new conversation
+    reset_conversation_history()
+
     # Return just the response string
     return response
 
@@ -1730,7 +1733,7 @@ def get_gemini_response(prompt, system_prompt=None, chat_history=True, max_retri
                         with tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8', suffix='.json') as f:
                             json.dump(cli_history, f, ensure_ascii=False, indent=2)
                             history_temp_file = f.name
-                        command_args.extend(["--history", history_temp_file])
+                        # command_args.extend(["--history", history_temp_file]) # Removed as per issue description
 
                     # ユーザーの現在のプロンプトを追加 (--text から -p に変更)
                     command_args.extend(["-p", prompt])
