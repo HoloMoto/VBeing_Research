@@ -88,3 +88,42 @@ audio20250825232551.webm,はい、承知いたしました。
 audio20250825232552.webm,はい、承知いたしました。私の名前はプネウマで、ユーザーとの自然な会話を行う高度なAIアシスタントとして、今後もサポートさせていただきます。
 audio20250825232553.webm,はい、承知いたしました。私の名前はプネウマで、高度なAIアシスタントとして、ユーザー様との自然な会話を行う役割を担っております。
 audio20250825232554.webm,はい、承知いたしました。私の名前はプネウマです。ユーザー様との自然な会話をサポートさせていただきます。
+audio20250825232555.webm,"Error occurred:
+Options:
+  -m, --model                    Model      [string] [default: ""gemini-2.5-pro""]
+  -p, --prompt                   Prompt. Appended to input on stdin (if any).
+                                                                        [string]
+  -s, --sandbox                  Run in sandbox?                       [boolean]
+      --sandbox-image            Sandbox image URI.                     [string]
+  -d, --debug                    Run in debug mode?   [boolean] [default: false]
+  -a, --all_files                Include ALL files in context?
+                                                      [boolean] [default: false]
+      --show_memory_usage        Show memory usage in status bar
+                                                      [boolean] [default: false]
+  -y, --yolo                     Automatically accept all actions (aka YOLO
+                                 mode, see
+                                 https://www.youtube.com/watch?v=xvFZjo5PgG0 for
+                                 more details)?       [boolean] [default: false]
+      --telemetry                Enable telemetry? This flag specifically
+                                 controls if telemetry is sent. Other
+                                 --telemetry-* flags set specific values but do
+                                 not enable telemetry on their own.    [boolean]
+      --telemetry-target         Set the telemetry target (local or gcp).
+                                 Overrides settings files.
+                                              [string] [choices: ""local"", ""gcp""]
+      --telemetry-otlp-endpoint  Set the OTLP endpoint for telemetry. Overrides
+                                 environment variables and settings files.
+                                                                        [string]
+      --telemetry-log-prompts    Enable or disable logging of user prompts for
+                                 telemetry. Overrides settings files.  [boolean]
+  -c, --checkpointing            Enables checkpointing of file edits
+                                                      [boolean] [default: false]
+  -v, --version                  Show version number                   [boolean]
+  -h, --help                     Show help                             [boolean]
+
+Unknown arguments: system, text, chat
+"
+audio20250825232556.webm,"私の名前はプネウマで、高度なAIアシスタントです。ユーザーとの自然な会話を行う役割を持っています。
+"
+audio20250825232557.webm,"私の名前はプネウマで、高度なAIアシスタントです。ユーザーとの自然な会話を行う役割を持っています。
+"

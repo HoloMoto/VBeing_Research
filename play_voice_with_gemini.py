@@ -901,7 +901,7 @@ def initialize_models():
         try:
             print(f"Checking model: {model_name}")
             # Simple test command to check if the model is available
-            test_cmd = ["--model", model_name, "--text", "Hello"]
+            test_cmd = ["--model", model_name, "-p", "Hello"]
             response = run_gemini_command(test_cmd)
 
             if not response.startswith("Error:"):
@@ -1603,15 +1603,16 @@ def get_gemini_response(prompt, system_prompt=None, chat_history=True, max_retri
                 system_temp_file = None
 
                 try:
-                    # Gemini CLIの'chat'サブコマンドを使用
-                    command_args = ["chat", "--model", model_name]
+                    # 新しいGemini CLI仕様に合わせてコマンドを構築
+                    command_args = ["--model", model_name]
 
-                    # システムプロンプトを一時ファイルに書き込み、そのパスをCLIに渡す
+                    # システムプロンプトは自動的に system_prompt.txt から読み込まれるため、
+                    # --system パラメータは不要になりました
                     if system_prompt:
                         with tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8', suffix='.txt') as f:
                             f.write(system_prompt)
                             system_temp_file = f.name
-                        command_args.extend(["--system", system_temp_file])
+                        # Note: --system parameter is no longer used as system_prompt.txt is automatically loaded
 
                     # 対話履歴をJSON形式で一時ファイルに書き込み、そのパスをCLIに渡す
                     if chat_history and get_gemini_response.CLI_CHAT_HISTORY:
@@ -1625,8 +1626,8 @@ def get_gemini_response(prompt, system_prompt=None, chat_history=True, max_retri
                             history_temp_file = f.name
                         command_args.extend(["--history", history_temp_file])
 
-                    # ユーザーの現在のプロンプトを追加
-                    command_args.extend(["--text", prompt])
+                    # ユーザーの現在のプロンプトを追加 (--text から -p に変更)
+                    command_args.extend(["-p", prompt])
 
                     print(f"Executing command: gemini {' '.join(command_args)}")
                     response = run_gemini_command(command_args)

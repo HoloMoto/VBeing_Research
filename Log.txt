@@ -1738,3 +1738,63 @@ Gemini: 今何時？
 generating
 --- END OF FULL PROMPT ---
 --------------------------------------------------
+[2025-08-27 15:10:30] [Error occurred:
+Options:
+  -m, --model                    Model      [string] [default: "gemini-2.5-pro"]
+  -p, --prompt                   Prompt. Appended to input on stdin (if any).
+                                                                        [string]
+  -s, --sandbox                  Run in sandbox?                       [boolean]
+      --sandbox-image            Sandbox image URI.                     [string]
+  -d, --debug                    Run in debug mode?   [boolean] [default: false]
+  -a, --all_files                Include ALL files in context?
+                                                      [boolean] [default: false]
+      --show_memory_usage        Show memory usage in status bar
+                                                      [boolean] [default: false]
+  -y, --yolo                     Automatically accept all actions (aka YOLO
+                                 mode, see
+                                 https://www.youtube.com/watch?v=xvFZjo5PgG0 for
+                                 more details)?       [boolean] [default: false]
+      --telemetry                Enable telemetry? This flag specifically
+                                 controls if telemetry is sent. Other
+                                 --telemetry-* flags set specific values but do
+                                 not enable telemetry on their own.    [boolean]
+      --telemetry-target         Set the telemetry target (local or gcp).
+                                 Overrides settings files.
+                                              [string] [choices: "local", "gcp"]
+      --telemetry-otlp-endpoint  Set the OTLP endpoint for telemetry. Overrides
+                                 environment variables and settings files.
+                                                                        [string]
+      --telemetry-log-prompts    Enable or disable logging of user prompts for
+                                 telemetry. Overrides settings files.  [boolean]
+  -c, --checkpointing            Enables checkpointing of file edits
+                                                      [boolean] [default: false]
+  -v, --version                  Show version number                   [boolean]
+  -h, --help                     Show help                             [boolean]
+
+Unknown arguments: system, text, chat
+]
+User: 9
+Gemini: こんにちは、疑似人格AI起動して
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-27 15:18:07] [私の名前はプネウマで、高度なAIアシスタントです。ユーザーとの自然な会話を行う役割を持っています。
+]
+User: 9
+Gemini: こんにちは！あなたは誰
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------
+[2025-08-27 15:28:44] [私の名前はプネウマで、高度なAIアシスタントです。ユーザーとの自然な会話を行う役割を持っています。
+]
+User: 9
+Gemini: こんにちは　あなたは誰？
+
+--- FULL PROMPT SENT TO GEMINI ---
+generating
+--- END OF FULL PROMPT ---
+--------------------------------------------------

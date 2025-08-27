@@ -327,14 +327,21 @@ def send_message():
                         import tempfile
                         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm', dir='Voice')
                         temp_filename = os.path.basename(temp_file.name)
+                        temp_path = temp_file.name
+
+                        # Important: Close the file handle explicitly
+                        temp_file.close()
 
                         # Write to temporary file for immediate playback
-                        with open(temp_file.name, "wb") as f:
+                        with open(temp_path, "wb") as f:
                             f.write(audio_data)
+
+                        # Add a small delay to ensure file system operations complete
+                        time.sleep(0.1)
 
                         # Play audio immediately from temporary file
                         # Use the absolute path directly, don't join with current working directory
-                        play_audio(temp_file.name)
+                        play_audio(temp_path)
 
                         # Save the audio data properly and update CSV in the background
                         filename = save_zonos_voice_data(audio_data, gemini_response)
@@ -344,7 +351,7 @@ def send_message():
 
                         # Clean up temporary file after permanent file is saved
                         try:
-                            os.unlink(temp_file.name)
+                            os.unlink(temp_path)
                         except:
                             pass
                 except Exception as e:
@@ -465,14 +472,21 @@ def direct_tts():
                     import tempfile
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm', dir='Voice')
                     temp_filename = os.path.basename(temp_file.name)
+                    temp_path = temp_file.name
+
+                    # Important: Close the file handle explicitly
+                    temp_file.close()
 
                     # Write to temporary file for immediate playback
-                    with open(temp_file.name, "wb") as f:
+                    with open(temp_path, "wb") as f:
                         f.write(audio_data)
+
+                    # Add a small delay to ensure file system operations complete
+                    time.sleep(0.1)
 
                     # Play audio immediately from temporary file
                     # Use the absolute path directly, don't join with current working directory
-                    play_audio(temp_file.name)
+                    play_audio(temp_path)
 
                     # Save the audio data properly and update CSV in the background
                     filename = save_zonos_voice_data(audio_data, text)
@@ -482,7 +496,7 @@ def direct_tts():
 
                     # Clean up temporary file after permanent file is saved
                     try:
-                        os.unlink(temp_file.name)
+                        os.unlink(temp_path)
                     except:
                         pass
             except Exception as e:
