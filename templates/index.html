@@ -189,6 +189,17 @@
                     </div>
                 </div>
 
+                <!-- Settings container for general options -->
+                <div class="settings-container" style="margin-top: 15px;">
+                    <label class="setting-option" style="display: flex; align-items: center; margin-bottom: 10px; cursor: pointer;">
+                        <input type="checkbox" id="wake-word-checkbox" style="margin-right: 8px;">
+                        <span>ウェイクワード「プネウマ」を有効にする</span>
+                    </label>
+                    <div style="font-size: 12px; color: #666; margin-bottom: 10px; margin-left: 24px;">
+                        有効にすると、「プネウマ」と呼びかけることで音声認識が開始されます。
+                    </div>
+                </div>
+
                 <!-- Clone voice selector (hidden by default) -->
                 <div class="clone-voice-container" id="clone-voice-container" style="display: none; margin-top: 15px;">
                     <span class="model-selector-label">Select clone voice:</span>
@@ -303,6 +314,9 @@
             let currentModel = null;
             let isRecording = false;
             let recognition = null;
+            let wakeWordRecognition = null;
+            let wakeWordEnabled = false;
+            const WAKE_WORD = "プネウマ";
 
             // Initialize the application
             initializeApp();
@@ -339,6 +353,9 @@
 
             // Initialize audio conversion tools
             initializeAudioConversion();
+
+            // Initialize wake word detection
+            initializeWakeWordDetection();
 
             // Functions
             async function initializeApp() {
@@ -965,6 +982,109 @@
                 isRecording = false;
                 micBtn.classList.remove('recording');
                 statusEl.textContent = 'Ready';
+
+                // Restart wake word detection if enabled
+                if (wakeWordEnabled) {
+                    setTimeout(startWakeWordDetection, 500);
+                }
+            }
+
+            // Wake word detection functions
+            function initializeWakeWordDetection() {
+                const wakeWordCheckbox = document.getElementById('wake-word-checkbox');
+
+                // Add event listener for wake word checkbox
+                wakeWordCheckbox.addEventListener('change', function() {
+                    wakeWordEnabled = this.checked;
+                    if (wakeWordEnabled) {
+                        startWakeWordDetection();
+                    } else {
+                        stopWakeWordDetection();
+                    }
+                });
+            }
+
+            function startWakeWordDetection() {
+                // Check if speech recognition is supported
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                    statusEl.textContent = 'Speech recognition not supported in this browser.';
+                    return;
+                }
+
+                // Create speech recognition object for wake word detection
+                wakeWordRecognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                wakeWordRecognition.lang = 'ja-JP';  // Set language to Japanese
+                wakeWordRecognition.continuous = false;
+                wakeWordRecognition.interimResults = true;
+
+                statusEl.textContent = `ウェイクワード「${WAKE_WORD}」を待機中...`;
+
+                wakeWordRecognition.onstart = function() {
+                    statusEl.textContent = `ウェイクワード「${WAKE_WORD}」を待機中...`;
+                };
+
+                wakeWordRecognition.onresult = function(event) {
+                    let interimTranscript = '';
+                    let finalTranscript = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        if (event.results[i].isFinal) {
+                            finalTranscript += event.results[i][0].transcript;
+                        } else {
+                            interimTranscript += event.results[i][0].transcript;
+                        }
+                    }
+
+                    const transcript = finalTranscript || interimTranscript;
+
+                    // Check if wake word is in the transcript
+                    if (transcript.toLowerCase().includes(WAKE_WORD.toLowerCase())) {
+                        console.log(`Wake word "${WAKE_WORD}" detected!`);
+                        statusEl.textContent = `ウェイクワード「${WAKE_WORD}」を検出しました！`;
+
+                        // Stop wake word detection and start regular speech recognition
+                        stopWakeWordDetection();
+                        setTimeout(startSpeechRecognition, 500);
+                    } else {
+                        statusEl.textContent = `聞き取り中: ${transcript}`;
+                    }
+                };
+
+                wakeWordRecognition.onend = function() {
+                    // Restart wake word detection if it's still enabled
+                    if (wakeWordEnabled) {
+                        try {
+                            wakeWordRecognition.start();
+                        } catch (e) {
+                            console.error('Wake word detection restart error:', e);
+                            setTimeout(startWakeWordDetection, 1000);
+                        }
+                    }
+                };
+
+                wakeWordRecognition.onerror = function(event) {
+                    console.error('Wake word detection error:', event.error);
+
+                    // Restart after error if still enabled
+                    if (wakeWordEnabled) {
+                        setTimeout(startWakeWordDetection, 1000);
+                    }
+                };
+
+                // Start wake word detection
+                try {
+                    wakeWordRecognition.start();
+                } catch (e) {
+                    console.error('Wake word detection start error:', e);
+                    statusEl.textContent = 'ウェイクワード検出の開始に失敗しました。';
+                }
+            }
+
+            function stopWakeWordDetection() {
+                if (wakeWordRecognition) {
+                    wakeWordRecognition.stop();
+                    wakeWordRecognition = null;
+                }
             }
 
             async function fetchQuotaUsage() {

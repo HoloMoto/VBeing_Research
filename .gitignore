@@ -26,3 +26,4 @@ ENV/
 .vscode/
 *.swp
 *.swo
+system_prompt.txt

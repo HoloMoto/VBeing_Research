@@ -2894,18 +2894,57 @@ def find_best_match_text_improved(response, voice_data, previous_responses=None,
 
     return best_match
 
-def listen_for_speech(language="ja-JP"):
+def listen_for_speech(language="ja-JP", wake_word_mode=False, wake_word="プネウマ"):
     """
     Capture audio from the microphone and convert it to text using speech recognition.
     Includes multiple recognition engines as fallbacks and enhanced error handling.
 
     Args:
         language: The language code for speech recognition (default: Japanese)
+        wake_word_mode: Whether to listen for a wake word before actual recognition
+        wake_word: The wake word to listen for (default: "プネウマ")
 
     Returns:
         The recognized text as a string, or None if recognition failed
     """
     recognizer = sr.Recognizer()
+
+    if wake_word_mode:
+        print(f"Listening for wake word '{wake_word}'...")
+
+        # Continuous listening for wake word
+        while True:
+            try:
+                with sr.Microphone() as source:
+                    # Shorter ambient noise adjustment for wake word detection
+                    recognizer.adjust_for_ambient_noise(source, duration=1)
+
+                    # Listen with shorter timeout for wake word
+                    audio = recognizer.listen(source, timeout=5, phrase_time_limit=3)
+
+                    try:
+                        # Use Google for wake word detection (most reliable for Japanese)
+                        potential_wake_word = recognizer.recognize_google(audio, language=language)
+                        print(f"Heard: {potential_wake_word}")
+
+                        # Check if wake word is in the recognized text
+                        if wake_word.lower() in potential_wake_word.lower():
+                            print(f"Wake word '{wake_word}' detected! Listening for command...")
+                            # Wake word detected, break out of wake word detection loop
+                            break
+                    except sr.UnknownValueError:
+                        # No speech detected, continue listening for wake word
+                        pass
+                    except sr.RequestError:
+                        # Network error, continue listening for wake word
+                        print("Network error during wake word detection, retrying...")
+                        time.sleep(1)
+
+            except Exception as e:
+                print(f"Error during wake word detection: {e}")
+                time.sleep(1)
+
+    # Regular speech recognition (either after wake word or direct mode)
     print("Listening... (Speak now)")
 
     try:
@@ -3267,6 +3306,12 @@ def main():
             print("\n===== Speech Recognition Mode =====")
             print("Say 'quit' to exit or 'change mode' to select a different mode")
 
+            # Ask if user wants to enable wake word detection
+            wake_word_enabled = input("Enable wake word detection? (y/n): ").lower() == 'y'
+            wake_word = "プネウマ"
+            if wake_word_enabled:
+                print(f"Wake word detection enabled. Say '{wake_word}' to activate speech recognition.")
+
             # Initialize mode-specific history variables without resetting global history
             # This allows us to track mode-specific selections while maintaining global conversation history
             mode_previous_responses = []
@@ -3277,7 +3322,9 @@ def main():
 
             while True:
                 print("\nWaiting for voice input...")
-                user_input = listen_for_speech()
+
+                # Use wake word mode if enabled
+                user_input = listen_for_speech(wake_word_mode=wake_word_enabled, wake_word=wake_word)
 
                 if not user_input:
                     print("No speech detected or could not recognize speech. Please try again.")
