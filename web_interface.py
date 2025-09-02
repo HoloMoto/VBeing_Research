@@ -24,6 +24,22 @@ from play_voice_with_gemini import (
     load_system_prompt
 )
 
+# Import settings module
+from settings import load_settings, save_settings, update_settings, get_setting
+
+def play_error_sound():
+    """
+    Play the error sound when an error occurs.
+    Uses the default error sound file at Voice/DefaultSystemVoice/error.wav.
+    """
+    error_sound_path = os.path.join('Voice', 'DefaultSystemVoice', 'error.wav')
+    try:
+        # Play the error sound in a separate thread to avoid blocking
+        threading.Thread(target=play_audio, args=(error_sound_path,)).start()
+        print("Playing error sound")
+    except Exception as e:
+        print(f"Failed to play error sound: {e}")
+
 def is_error_response(response):
     """
     Check if a Gemini response contains an error.
@@ -54,6 +70,8 @@ def is_error_response(response):
 
     for indicator in error_indicators:
         if indicator.lower() in response.lower():
+            # Play error sound when Gemini returns an error response
+            play_error_sound()
             return True
 
     return False
@@ -74,6 +92,7 @@ voice_data = None
 models = None
 current_model = None  # Currently selected model
 system_prompt = None  # System prompt to guide Gemini's responses
+user_settings = None  # User settings loaded from settings.json
 
 # Cache for Zonos connection status
 zonos_connection_cache = {
@@ -91,9 +110,13 @@ def index():
 @app.route('/api/init', methods=['POST'])
 def initialize():
     """Initialize the application"""
-    global voice_data, models, system_prompt
+    global voice_data, models, system_prompt, user_settings, current_mode, current_model
 
     try:
+        # Load user settings
+        user_settings = load_settings()
+        print("User settings loaded:", user_settings)
+
         # Load voice data
         voice_data = load_voice_data()
 
@@ -118,6 +141,22 @@ def initialize():
         if not available_models:
             available_models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-pro-vision']
 
+        # Apply saved settings
+        if user_settings:
+            # Set current model from settings if it's available
+            if "model" in user_settings and user_settings["model"] in available_models:
+                current_model = user_settings["model"]
+                print(f"Applied saved model setting: {current_model}")
+
+            # Set current mode from settings
+            if "mode" in user_settings and user_settings["mode"] in [1, 2, 5, 6, 7, 8, 9]:
+                current_mode = user_settings["mode"]
+                # Also load the appropriate system prompt for this mode
+                mode_system_prompt = load_mode_specific_system_prompt(current_mode)
+                if mode_system_prompt:
+                    system_prompt = mode_system_prompt
+                print(f"Applied saved mode setting: {current_mode}")
+
         return jsonify({
             'status': 'success',
             'message': 'System initialized successfully',
@@ -130,9 +169,16 @@ def initialize():
                 {'id': 8, 'name': 'Speech RAG mode'},
                 {'id': 9, 'name': 'Zonos voice generation mode'}
             ],
-            'available_models': [{'id': model, 'name': model} for model in available_models]
+            'available_models': [{'id': model, 'name': model} for model in available_models],
+            'current_settings': {
+                'model': current_model,
+                'mode': current_mode,
+                'voice': user_settings.get('voice', {}) if user_settings else {}
+            }
         })
     except Exception as e:
+        # Play error sound when initialization fails
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Initialization failed: {str(e)}'
@@ -210,18 +256,20 @@ def load_mode_specific_system_prompt(mode):
                 continue  # Try the next encoding
             except Exception as e:
                 print(f"Error with encoding {encoding}: {e}")
+                play_error_sound()
                 continue
 
         print(f"Could not read system prompt template for mode {mode} with any encoding. Using default system prompt.")
         return load_system_prompt()  # Fall back to default system prompt
     except Exception as e:
         print(f"Error loading system prompt template for mode {mode}: {e}")
+        play_error_sound()
         return load_system_prompt()  # Fall back to default system prompt
 
 @app.route('/api/set_mode', methods=['POST'])
 def set_mode():
     """Set the current mode"""
-    global current_mode, system_prompt
+    global current_mode, system_prompt, user_settings
 
     data = request.json
     mode = data.get('mode')
@@ -236,6 +284,8 @@ def set_mode():
     if mode == 9:
         success, message = check_zonos_connection()
         if not success:
+            # Play error sound when Zonos connection fails
+            play_error_sound()
             return jsonify({
                 'status': 'warning',
                 'message': f'Zonosモードを有効にしましたが、接続テストに失敗しました: {message}'
@@ -250,6 +300,14 @@ def set_mode():
 
     current_mode = mode
 
+    # Save the mode setting
+    if user_settings is None:
+        user_settings = load_settings()
+
+    user_settings["mode"] = mode
+    save_settings(user_settings)
+    print(f"Saved mode setting: {mode}")
+
     return jsonify({
         'status': 'success',
         'message': f'Mode set to {mode}'
@@ -258,7 +316,7 @@ def set_mode():
 @app.route('/api/set_model', methods=['POST'])
 def set_model():
     """Set the current model"""
-    global current_model
+    global current_model, user_settings
 
     data = request.json
     model = data.get('model')
@@ -282,6 +340,14 @@ def set_model():
         }), 400
 
     current_model = model
+
+    # Save the model setting
+    if user_settings is None:
+        user_settings = load_settings()
+
+    user_settings["model"] = model
+    save_settings(user_settings)
+    print(f"Saved model setting: {model}")
 
     return jsonify({
         'status': 'success',
@@ -336,13 +402,24 @@ def send_message():
                     'message': 'Geminiの応答にエラーが検出されたため、音声生成をスキップしました。'
                 })
 
-            # Check if clone voice is specified
-            use_clone_voice = data.get('use_clone_voice', False)
+            # Check if clone voice is specified in the request
+            use_clone_voice = data.get('use_clone_voice', None)
             clone_voice_file = data.get('clone_voice_file', None)
+
+            # If not specified in the request, use saved settings
+            if use_clone_voice is None and user_settings and 'voice' in user_settings:
+                use_clone_voice = user_settings['voice'].get('use_clone_voice', False)
+                print(f"Using saved voice setting: use_clone_voice={use_clone_voice}")
+
+            if clone_voice_file is None and user_settings and 'voice' in user_settings:
+                clone_voice_file = user_settings['voice'].get('clone_voice_file', None)
+                print(f"Using saved voice setting: clone_voice_file={clone_voice_file}")
 
             # Check Zonos connection using cache
             success, message = check_zonos_connection()
             if not success:
+                # Play error sound when Zonos API connection fails
+                play_error_sound()
                 return jsonify({
                     'status': 'error',
                     'message': f'Zonos API接続エラー: {message}'
@@ -449,6 +526,8 @@ def send_message():
             })
 
     except Exception as e:
+        # Play error sound when message processing fails
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Error processing message: {str(e)}'
@@ -470,6 +549,8 @@ def reset_conversation():
 def direct_tts():
     """Generate voice directly using Zonos API for debugging purposes"""
     try:
+        global user_settings
+
         data = request.json
         text = data.get('text', '').strip()
 
@@ -479,13 +560,24 @@ def direct_tts():
                 'message': 'Empty text'
             }), 400
 
-        # Check if clone voice is specified
-        use_clone_voice = data.get('use_clone_voice', False)
+        # Check if clone voice is specified in the request
+        use_clone_voice = data.get('use_clone_voice', None)
         clone_voice_file = data.get('clone_voice_file', None)
+
+        # If not specified in the request, use saved settings
+        if use_clone_voice is None and user_settings and 'voice' in user_settings:
+            use_clone_voice = user_settings['voice'].get('use_clone_voice', False)
+            print(f"Using saved voice setting: use_clone_voice={use_clone_voice}")
+
+        if clone_voice_file is None and user_settings and 'voice' in user_settings:
+            clone_voice_file = user_settings['voice'].get('clone_voice_file', None)
+            print(f"Using saved voice setting: clone_voice_file={clone_voice_file}")
 
         # Check Zonos connection using cache
         success, message = check_zonos_connection()
         if not success:
+            # Play error sound when Zonos API connection fails
+            play_error_sound()
             return jsonify({
                 'status': 'error',
                 'message': f'Zonos API接続エラー: {message}'
@@ -544,6 +636,7 @@ def direct_tts():
                         del app.audio_cache[k]
             except Exception as e:
                 print(f"Error in asynchronous voice generation: {e}")
+                play_error_sound()
 
         # Start the voice generation in a separate thread
         threading.Thread(target=generate_and_save_voice).start()
@@ -557,6 +650,8 @@ def direct_tts():
         })
 
     except Exception as e:
+        # Play error sound when voice generation fails
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Error generating voice: {str(e)}'
@@ -574,6 +669,7 @@ def get_clone_voices():
             'voices': voices
         })
     except Exception as e:
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Error getting clone voices: {str(e)}'
@@ -591,6 +687,7 @@ def get_quota_usage():
             'quota_stats': quota_stats
         })
     except Exception as e:
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Error getting quota usage statistics: {str(e)}'
@@ -603,6 +700,8 @@ def serve_audio(filename):
     file_path = audio_dir / filename
 
     if not file_path.exists():
+        # Play error sound when audio file is not found
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Audio file {filename} not found'
@@ -614,6 +713,8 @@ def serve_audio(filename):
 def stream_audio(cache_key):
     """Stream audio data directly from memory cache"""
     if not hasattr(app, 'audio_cache') or cache_key not in app.audio_cache:
+        # Play error sound when audio data is not found in cache
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Audio data for key {cache_key} not found in cache'
@@ -685,9 +786,84 @@ def convert_audio():
             'message': 'Batch conversion started in the background'
         })
     except Exception as e:
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Error starting batch conversion: {str(e)}'
+        }), 500
+
+@app.route('/api/check_model_file', methods=['GET'])
+def check_model_file():
+    """Check if a model file exists on the server"""
+    try:
+        model_path = request.args.get('path', '')
+        if not model_path:
+            return jsonify({
+                'status': 'error',
+                'message': 'No model path provided'
+            }), 400
+
+        # Remove leading slash if present
+        if model_path.startswith('/'):
+            model_path = model_path[1:]
+
+        # Check if the file exists
+        full_path = os.path.join(os.getcwd(), model_path)
+        exists = os.path.isfile(full_path)
+
+        # Get file info if it exists
+        file_info = {}
+        if exists:
+            file_info = {
+                'size': os.path.getsize(full_path),
+                'modified': os.path.getmtime(full_path),
+                'path': full_path
+            }
+
+        return jsonify({
+            'status': 'success',
+            'exists': exists,
+            'file_info': file_info
+        })
+    except Exception as e:
+        print(f"Error checking model file: {str(e)}")
+        play_error_sound()
+        return jsonify({
+            'status': 'error',
+            'message': f'Error checking model file: {str(e)}'
+        }), 500
+
+@app.route('/api/log_character_event', methods=['POST'])
+def log_character_event():
+    """Log character initialization events and errors to the server"""
+    try:
+        data = request.json
+        event_type = data.get('event_type', 'unknown')
+        message = data.get('message', '')
+        details = data.get('details', {})
+
+        # Log the event to the server log
+        print(f"[Character Event] {event_type}: {message}")
+        if details:
+            print(f"[Character Event Details] {json.dumps(details, indent=2)}")
+
+        # Log to the Log.txt file
+        with open('Log.txt', 'a', encoding='utf-8') as log_file:
+            timestamp = time.strftime('[%Y-%m-%d %H:%M:%S]')
+            log_file.write(f"{timestamp} [Character {event_type}] {message}\n")
+            if details:
+                log_file.write(f"{timestamp} [Character Details] {json.dumps(details, ensure_ascii=False)}\n")
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Event logged successfully'
+        })
+    except Exception as e:
+        print(f"Error logging character event: {str(e)}")
+        play_error_sound()
+        return jsonify({
+            'status': 'error',
+            'message': f'Error logging event: {str(e)}'
         }), 500
 
 # System Prompt API Endpoints
@@ -713,6 +889,7 @@ def get_current_system_prompt():
             'content': system_prompt
         })
     except Exception as e:
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Error loading system prompt: {str(e)}'
@@ -749,6 +926,7 @@ def save_current_system_prompt():
             'message': 'System prompt saved successfully'
         })
     except Exception as e:
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Error saving system prompt: {str(e)}'
@@ -779,6 +957,7 @@ def get_system_prompt_templates():
             'templates': templates
         })
     except Exception as e:
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Error getting templates: {str(e)}'
@@ -813,6 +992,7 @@ def get_system_prompt_template(filename):
             'content': content
         })
     except Exception as e:
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Error getting template: {str(e)}'
@@ -855,6 +1035,7 @@ def save_system_prompt_template():
             'filename': filename
         })
     except Exception as e:
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Error saving template: {str(e)}'
@@ -884,9 +1065,102 @@ def delete_system_prompt_template(filename):
             'message': f'Template {filename} deleted successfully'
         })
     except Exception as e:
+        play_error_sound()
         return jsonify({
             'status': 'error',
             'message': f'Error deleting template: {str(e)}'
+        }), 500
+
+# Settings API Endpoints
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    """Get the current settings"""
+    global user_settings
+
+    try:
+        # If settings haven't been loaded yet, load them
+        if user_settings is None:
+            user_settings = load_settings()
+
+        return jsonify({
+            'status': 'success',
+            'settings': user_settings
+        })
+    except Exception as e:
+        play_error_sound()
+        return jsonify({
+            'status': 'error',
+            'message': f'Error getting settings: {str(e)}'
+        }), 500
+
+@app.route('/api/settings', methods=['POST'])
+def update_settings():
+    """Update settings"""
+    global user_settings
+
+    try:
+        data = request.json
+        settings_to_update = data.get('settings', {})
+
+        # If settings haven't been loaded yet, load them
+        if user_settings is None:
+            user_settings = load_settings()
+
+        # Update settings
+        for key, value in settings_to_update.items():
+            user_settings[key] = value
+
+        # Save updated settings
+        save_settings(user_settings)
+        print(f"Settings updated: {settings_to_update}")
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Settings updated successfully',
+            'settings': user_settings
+        })
+    except Exception as e:
+        play_error_sound()
+        return jsonify({
+            'status': 'error',
+            'message': f'Error updating settings: {str(e)}'
+        }), 500
+
+@app.route('/api/settings/voice', methods=['POST'])
+def update_voice_settings():
+    """Update voice settings"""
+    global user_settings
+
+    try:
+        data = request.json
+        use_clone_voice = data.get('use_clone_voice', False)
+        clone_voice_file = data.get('clone_voice_file', None)
+
+        # If settings haven't been loaded yet, load them
+        if user_settings is None:
+            user_settings = load_settings()
+
+        # Update voice settings
+        if 'voice' not in user_settings:
+            user_settings['voice'] = {}
+
+        user_settings['voice']['use_clone_voice'] = use_clone_voice
+        user_settings['voice']['clone_voice_file'] = clone_voice_file
+
+        # Save updated settings
+        save_settings(user_settings)
+        print(f"Voice settings updated: use_clone_voice={use_clone_voice}, clone_voice_file={clone_voice_file}")
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Voice settings updated successfully',
+            'voice_settings': user_settings['voice']
+        })
+    except Exception as e:
+        play_error_sound()
+        return jsonify({
+            'status': 'error',
+            'message': f'Error updating voice settings: {str(e)}'
         }), 500
 
 if __name__ == '__main__':

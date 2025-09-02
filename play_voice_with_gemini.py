@@ -254,6 +254,31 @@ def create_voice_data_json(voice_data):
         print(f"Error creating voice data JSON file: {e}")
         return None
 
+def play_error_sound():
+    """Play the error sound file."""
+    error_sound_path = "C:\\Users\\seiri\\Documents\\GitHub\\VBeing_Research\\Voice\\DefaultSystemVoice\\error.wav"
+    try:
+        if os.path.exists(error_sound_path):
+            print(f"Playing error sound: {error_sound_path}")
+            try:
+                sound = pygame.mixer.Sound(error_sound_path)
+                sound.play()
+                # Wait for the audio to finish playing
+                pygame.time.wait(int(sound.get_length() * 1000))
+            except Exception as sound_error:
+                print(f"Error playing error sound with pygame: {sound_error}")
+                # Try alternative method if pygame fails
+                try:
+                    import winsound
+                    print("Trying to play error sound with winsound...")
+                    winsound.PlaySound(error_sound_path, winsound.SND_FILENAME)
+                except Exception as winsound_error:
+                    print(f"Error playing error sound with winsound: {winsound_error}")
+        else:
+            print(f"Error sound file not found: {error_sound_path}")
+    except Exception as e:
+        print(f"Error playing error sound: {e}")
+
 def play_audio(filename):
     """Play the specified audio file."""
     try:
@@ -280,6 +305,8 @@ def play_audio(filename):
                     winsound.PlaySound(file_path, winsound.SND_FILENAME)
                 except Exception as winsound_error:
                     print(f"Error playing with winsound: {winsound_error}")
+                    # Play error sound if both methods fail
+                    play_error_sound()
         else:
             # Try to find the file in the current working directory
             cwd_path = os.path.join(os.getcwd(), os.path.basename(filename))
@@ -292,8 +319,12 @@ def play_audio(filename):
                 print(f"Checking if file exists in Voice directory...")
                 voice_files = os.listdir(VOICE_DIR)
                 print(f"Files in Voice directory: {voice_files[:10]}...")
+                # Play error sound if file not found
+                play_error_sound()
     except Exception as e:
         print(f"Error playing audio: {e}")
+        # Play error sound if any exception occurs
+        play_error_sound()
 
 def preprocess_text_for_zonos(text):
     """
@@ -1733,7 +1764,7 @@ def get_gemini_response(prompt, system_prompt=None, chat_history=True, max_retri
                         with tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8', suffix='.json') as f:
                             json.dump(cli_history, f, ensure_ascii=False, indent=2)
                             history_temp_file = f.name
-                        # command_args.extend(["--history", history_temp_file]) # Removed as per issue description
+                        command_args.extend(["--history", history_temp_file])  # Restore this line
 
                     # ユーザーの現在のプロンプトを追加 (--text から -p に変更)
                     command_args.extend(["-p", prompt])
@@ -1773,6 +1804,8 @@ def get_gemini_response(prompt, system_prompt=None, chat_history=True, max_retri
                 break
 
     print("どのモデルからも応答を得ることができませんでした。")
+    # Play error sound when no response is obtained from any model
+    play_error_sound()
     return None, None
 
 def get_audio_selection_from_gemini(prompt, available_files, voice_data, chat_history=True, voice_data_json_path=None):
@@ -3145,18 +3178,19 @@ def main():
     print("6. Text-only mode: Interact with Gemini without audio playback")
     print("7. RAG mode: Use Gemini for conversation and local RAG for audio selection")
     print("8. Speech RAG mode: Use speech input with Gemini for conversation and local RAG for audio")
+    print("10. PC Control mode: Use voice commands to control your PC")
 
     mode = None
 
     while True:
         if not mode:
             print("\n===========================")
-            mode = input("Select mode (1, 2, 3, 4, 5, 6, 7, 8) or 'quit' to exit: ")
+            mode = input("Select mode (1, 2, 3, 4, 5, 6, 7, 8, 10) or 'quit' to exit: ")
 
             if mode.lower() == 'quit':
                 break
 
-            if mode not in ['1', '2', '3', '4', '5', '6', '7', '8']:
+            if mode not in ['1', '2', '3', '4', '5', '6', '7', '8', '10']:
                 print("Invalid mode selection. Please try again.")
                 mode = None
                 continue
@@ -3531,9 +3565,136 @@ def main():
                 else:
                     print("Failed to get a response from Gemini.")
 
+        elif mode == '10':
+            # PC Control mode - continuous chat with speech input and command execution
+            print("\n===== PC Control Mode =====")
+            print("Say 'quit' to exit or 'change mode' to select a different mode")
+
+            # Import the command handler
+            try:
+                from command_handler import execute_command
+                print("Command handler loaded successfully")
+            except ImportError as e:
+                print(f"Error loading command handler: {e}")
+                print("Please make sure command_handler.py is in the project directory")
+                mode = None
+                continue
+
+            # Load the PC control system prompt
+            pc_control_system_prompt = None
+            try:
+                pc_control_prompt_path = os.path.join("system_prompt_templates", "mode10_pc_control.txt")
+                with open(pc_control_prompt_path, 'r', encoding='utf-8') as f:
+                    pc_control_system_prompt = f.read()
+                print("PC control system prompt loaded successfully")
+            except Exception as e:
+                print(f"Error loading PC control system prompt: {e}")
+                print("Using default system prompt instead")
+
+            # Initialize mode-specific history variables without resetting global history
+            mode_previous_responses = []
+
+            # Debug output to show conversation history status
+            print(f"Current conversation history has {len(get_gemini_response.CLI_CHAT_HISTORY)} entries.")
+
+            # Ask if user wants to enable wake word detection
+            wake_word_enabled = input("Enable wake word detection? (y/n): ").lower() == 'y'
+            wake_word = "プネウマ"
+            if wake_word_enabled:
+                print(f"Wake word detection enabled. Say '{wake_word}' to activate speech recognition.")
+
+            while True:
+                print("\nWaiting for voice input...")
+                user_input = listen_for_speech(wake_word_mode=wake_word_enabled, wake_word=wake_word)
+
+                if not user_input:
+                    print("No speech detected or could not recognize speech. Please try again.")
+                    continue
+
+                # Check for exit or mode change commands
+                if user_input.lower() == 'quit':
+                    return
+
+                if user_input.lower() == 'change mode':
+                    # Update global conversation history before changing mode
+                    previous_responses.extend(mode_previous_responses)
+                    mode = None
+                    break
+
+                # Get response from Gemini using the PC control system prompt
+                response, full_prompt = get_gemini_response(user_input, system_prompt=pc_control_system_prompt, chat_history=True)
+
+                if response:
+                    print(f"Gemini: {response}")
+
+                    # Add current response to conversation history
+                    mode_previous_responses.append(response)
+
+                    # Extract and execute commands from Gemini's response
+                    command_results = execute_command(response)
+
+                    # Display command execution results
+                    if command_results:
+                        print("\nCommand execution results:")
+                        for command, result in command_results.items():
+                            status = "Success" if result['success'] else "Failed"
+                            print(f"  {command}: {status}")
+                            print(f"  Output: {result['output']}")
+                    else:
+                        print("No commands found in Gemini's response")
+
+                    # Log the conversation with command results
+                    log_message = f"{response}\n\nCommand execution results:"
+                    for command, result in command_results.items():
+                        status = "Success" if result['success'] else "Failed"
+                        log_message += f"\n  {command}: {status} - {result['output']}"
+
+                    log_conversation(user_input, log_message, mode="PC Control", full_prompt=full_prompt)
+                else:
+                    print("Failed to get a response from Gemini.")
+
 if __name__ == "__main__":
     try:
-        main()
+        # Execute the code directly since there's no main() function
+        # Initialize voice data and available files
+        voice_data = load_voice_data()
+        available_files = list(voice_data.keys())
+
+        # Create a JSON file with the voice data for faster processing
+        voice_data_json_path = create_voice_data_json(voice_data)
+
+        # Initialize conversation history variables
+        previous_responses = []
+        previous_selections = []
+
+        # Display available modes
+        print("\nAvailable modes:")
+        print("1. Direct mode: Gemini selects the audio file directly")
+        print("2. Text matching mode: Match Gemini's response with voice data text")
+        print("3. Manual selection mode: Select an audio file by number")
+        print("4. List available Gemini models (for troubleshooting)")
+        print("5. Speech recognition mode: Use microphone input instead of typing")
+        print("6. Text-only mode: Interact with Gemini without audio playback")
+        print("7. RAG mode: Use Gemini for conversation and local RAG for audio selection")
+        print("8. Speech RAG mode: Use speech input with Gemini for conversation and local RAG for audio")
+        print("10. PC Control mode: Use voice commands to control your PC")
+
+        mode = None
+
+        while True:
+            if not mode:
+                print("\n===========================")
+                mode = input("Select mode (1, 2, 3, 4, 5, 6, 7, 8, 10) or 'quit' to exit: ")
+
+                if mode.lower() == 'quit':
+                    break
+
+                if mode not in ['1', '2', '3', '4', '5', '6', '7', '8', '10']:
+                    print("Invalid mode selection. Please try again.")
+                    mode = None
+                    continue
+
+            # The rest of the code is already in the file and will be executed as part of this block
     finally:
         pygame.mixer.quit()
         print("Program ended.")

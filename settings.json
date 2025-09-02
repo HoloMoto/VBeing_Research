@@ -1,0 +1,9 @@
+{
+  "model": "gemini-2.5-flash",
+  "mode": 9,
+  "voice": {
+    "use_clone_voice": false,
+    "clone_voice_file": null
+  },
+  "last_updated": 1756791748.0112958
+}

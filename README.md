@@ -1,13 +1,13 @@
-# Voice Playback with Gemini
+# Pneuma (Personal Nurturing Entity for User Maid Assistance)
 
 
 [日本語版はこちら (Japanese Version)](README_JP.md)
 
-This project uses Google's Gemini AI to play audio files from the `Voice/` directory according to the data in `voiceData.csv`.
+Pneuma is a personal assistant project that uses Google's Gemini AI to play audio files from the `Voice/` directory according to the data in `voiceData.csv`.
 
 ## Overview
 
-The script provides nine modes of operation:
+The script provides ten modes of operation:
 
 1. **Direct mode**: Gemini selects the audio file directly based on your prompt
 2. **Text matching mode**: Match Gemini's response with voice data text
@@ -18,6 +18,7 @@ The script provides nine modes of operation:
 7. **RAG mode**: Use Gemini for conversation and local RAG for audio selection (token-efficient)
 8. **Speech RAG mode**: Use speech input with Gemini for conversation and local RAG for audio (token-efficient)
 9. **Zonos voice generation mode**: Generate new voice audio using the Zyphra API for each response
+10. **PC Control mode**: Use voice commands to control your PC (execute programs, manage files, etc.)
 
 All conversations with Gemini are automatically logged to a `Log.txt` file for future reference.
 
@@ -49,6 +50,10 @@ All conversations with Gemini are automatically logged to a `Log.txt` file for f
 3. (Optional) Configure a custom system prompt:
    - Edit the `system_prompt.txt` file with your custom system prompt instructions
 4. Install required Python packages:
+   ```
+   pip install -r requirements.txt
+   ```
+   Or install packages individually:
    ```
    pip install pygame SpeechRecognition pyaudio python-dotenv flask
    ```
@@ -117,6 +122,20 @@ In this mode, the script uses Gemini only for generating conversational response
 
 This mode combines the token efficiency of Mode 7 with the convenience of speech recognition from Mode 5. You can speak into your microphone, and the script will convert your speech to text, use Gemini to generate a response, and then use local RAG to select the most appropriate audio file. This provides a fully voice-interactive experience while minimizing API token usage.
 
+### Mode 10: PC Control
+
+This mode allows you to control your PC using voice commands. You can speak into your microphone, and the script will convert your speech to text, use Gemini to understand your intent, and execute the appropriate command on your PC. The system supports various operations such as:
+
+- Starting applications (Edge, Chrome, Notepad, Calculator)
+- Opening files and creating folders
+- Controlling system functions (volume, shutdown, restart)
+- Taking screenshots
+- Opening websites and performing web searches
+
+The mode uses a specialized system prompt that instructs Gemini to return standardized command strings in the format `run_command('command_name')` or `run_command('command_name', 'argument')`. These commands are then processed by the command handler, which either executes built-in commands or calls external command scripts.
+
+You can extend the functionality by adding your own command scripts to the `command_scripts` directory. Each script should accept command-line arguments and return appropriate exit codes.
+
 ## Conversation Logging
 
 All interactions with Gemini are automatically logged to a `Log.txt` file in the same directory as the script. Each log entry includes:
@@ -182,6 +201,10 @@ These optimizations work together to provide a responsive, efficient, and accura
 - `templates/`: Directory containing HTML templates for the web interface
 - `static/`: Directory containing static files (CSS, JavaScript) for the web interface
 - `system_prompt_templates/`: Directory containing template system prompts for different modes
+- `command_handler.py`: Script for handling PC control commands
+- `command_scripts/`: Directory containing external command scripts for PC control
+  - `open_website.py`: Script for opening websites in the default browser
+  - `search_web.py`: Script for searching the web with a specific query
 
 ## Security
 

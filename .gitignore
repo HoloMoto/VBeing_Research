@@ -28,3 +28,4 @@ ENV/
 *.swo
 system_prompt.txt
 system_prompt.txt
+Log.txt

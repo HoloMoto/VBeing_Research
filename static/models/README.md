@@ -1,6 +1,6 @@
 # 3D Character Models Directory
 
-This directory is a placeholder for future 3D character models that will be used in the Gemini Voice Interface.
+This directory is a placeholder for future 3D character models that will be used in Pneuma (Personal Nurturing Entity for User Maid Assistance).
 
 ## Future Implementation
 

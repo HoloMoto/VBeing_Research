@@ -1,6 +1,6 @@
-# Gemini Voice Interface - Web GUI
+# Pneuma - Web GUI
 
-This is a web-based graphical user interface for the Gemini Voice Interaction System. It allows you to interact with Gemini through a browser interface, with support for text and speech input, and audio playback.
+This is a web-based graphical user interface for Pneuma (Personal Nurturing Entity for User Maid Assistance). It allows you to interact with Pneuma through a browser interface, with support for text and speech input, and audio playback.
 
 ## Features
 
